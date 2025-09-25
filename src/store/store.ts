@@ -38,7 +38,7 @@ export interface CreateStore<S extends AnyState> {
   setStoreUpdater?: (
     setState: (state: S) => void,
     getState: () => S,
-    getInitialState?: () => S
+    getInitialState?: () => S,
   ) => {
     updateMdw: BaseMiddleware<UpdaterCtx<S>>;
     initializeStore: Callable<any>;
@@ -49,7 +49,7 @@ export const IdContext = createContext("starfx:id", 0);
 
 const defaultStoreUpdater = <S extends AnyState, T>(
   setState: (state: S) => void,
-  getState: () => S
+  getState: () => S,
 ) => {
   enablePatches();
 
@@ -146,7 +146,7 @@ export function createStore<S extends AnyState, T>({
   const { updateMdw, initializeStore } = setStoreUpdater(
     setState,
     getState,
-    getInitialState
+    getInitialState,
   );
   function createUpdater() {
     const fn = compose<UpdaterCtx<S>>([
@@ -187,7 +187,7 @@ export function createStore<S extends AnyState, T>({
           acc[key] = s[key];
           return acc;
         },
-        { ...initialState }
+        { ...initialState },
       );
 
       Object.keys(s).forEach((key: keyof S) => {
@@ -220,7 +220,7 @@ export function createStore<S extends AnyState, T>({
     // stubs so `react-redux` is happy
     // deno-lint-ignore no-explicit-any
     replaceReducer<S = any>(
-      _nextReducer: (_s: S, _a: AnyAction) => void
+      _nextReducer: (_s: S, _a: AnyAction) => void,
     ): void {
       throw new Error(stubMsg);
     },

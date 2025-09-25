@@ -3,18 +3,16 @@
   "version": "0.15.0",
   "description": "A micro-mvc framework for react apps",
   "type": "module",
-  "files": [
-    "/dist"
-  ],
+  "files": ["/dist"],
   "sideEffects": false,
   "main": "./dist/cjs/index.js",
   "types": "./dist/types/index.d.ts",
   "module": "./dist/esm/index.js",
   "scripts": {
     "test": "vitest --exclude examples",
-    "lint": "@biomejs/biome check --write",
-    "fmt": "@biomejs/biome check --write --linter-enabled=false",
-    "ci": "@biomejs/biome ci .",
+    "lint": "biome check --write",
+    "fmt": "biome check --write --linter-enabled=false",
+    "ci": "biome ci .",
     "template": "tsx ./api-type-template.mts",
     "build": "tsx ./build.mts"
   },

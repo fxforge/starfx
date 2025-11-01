@@ -6,6 +6,7 @@ import {
   safe,
   takeEvery,
   takeLatest,
+  until,
   waitFor,
 } from "../index.js";
 import type { ApiCtx, Next, ThunkCtx } from "../index.js";
@@ -93,7 +94,7 @@ test("basic", () => {
     },
   );
 
-  store.run(query.bootup);
+  store.run(query.register);
 
   store.dispatch(fetchUsers());
   expect(store.getState().users).toEqual({ [mockUser.id]: mockUser });
@@ -133,7 +134,7 @@ test("with loader", () => {
     },
   );
 
-  store.run(api.bootup);
+  store.run(api.register);
 
   store.dispatch(fetchUsers());
   assertLike(store.getState(), {
@@ -174,7 +175,7 @@ test("with item loader", () => {
     },
   );
 
-  store.run(api.bootup);
+  store.run(api.register);
 
   const action = fetchUser({ id: mockUser.id });
   store.dispatch(action);
@@ -238,7 +239,7 @@ test("with POST", () => {
     },
   );
 
-  store.run(query.bootup);
+  store.run(query.register);
   store.dispatch(createUser({ email: mockUser.email }));
 });
 
@@ -255,7 +256,7 @@ test("simpleCache", () => {
   });
 
   const fetchUsers = api.get("/users", { supervisor: takeEvery }, api.cache());
-  store.run(api.bootup);
+  store.run(api.register);
 
   const action = fetchUsers();
   store.dispatch(action);
@@ -302,7 +303,7 @@ test("overriding default loader behavior", () => {
     },
   );
 
-  store.run(api.bootup);
+  store.run(api.register);
 
   store.dispatch(fetchUsers());
   assertLike(store.getState(), {
@@ -335,7 +336,7 @@ test("mdw.api() - error handler", () => {
 
   const fetchUsers = query.create("/users", { supervisor: takeEvery });
 
-  store.run(query.bootup);
+  store.run(query.register);
   store.dispatch(fetchUsers());
 });
 
@@ -364,7 +365,7 @@ test("createApi with own key", async () => {
       yield* next();
       const buff = yield* safe(() => {
         if (!ctx.response) throw new Error("no response");
-        return ctx.response.arrayBuffer();
+        return until(ctx.response.arrayBuffer());
       });
       if (!buff.ok) {
         throw buff.error;
@@ -389,11 +390,11 @@ test("createApi with own key", async () => {
   );
   const newUEmail = `${mockUser.email}.org`;
 
-  store.run(query.bootup);
+  store.run(query.register);
 
   store.dispatch(createUserCustomKey({ email: newUEmail }));
 
-  await store.run(waitForLoader(schema.loaders, createUserCustomKey));
+  await store.run(() => waitForLoader(schema.loaders, createUserCustomKey));
 
   const expectedKey = theTestKey
     ? `/users [POST]|${theTestKey}`
@@ -432,7 +433,7 @@ test("createApi with custom key but no payload", async () => {
       yield* next();
       const buff = yield* safe(() => {
         if (!ctx.response) throw new Error("no response");
-        return ctx.response?.arrayBuffer();
+        return until(ctx.response?.arrayBuffer());
       });
       if (!buff.ok) {
         throw buff.error;
@@ -456,10 +457,10 @@ test("createApi with custom key but no payload", async () => {
     },
   );
 
-  store.run(query.bootup);
+  store.run(query.register);
   store.dispatch(getUsers());
 
-  await store.run(waitForLoader(schema.loaders, getUsers));
+  await store.run(() => waitForLoader(schema.loaders, getUsers));
 
   const expectedKey = theTestKey
     ? `/users [GET]|${theTestKey}`
@@ -521,7 +522,7 @@ test("errorHandler", () => {
       users: {},
     },
   });
-  store.run(query.bootup);
+  store.run(query.register);
   store.dispatch(fetchUsers());
   expect(store.getState()).toEqual({
     users: {},
@@ -556,10 +557,14 @@ test("stub predicate", async () => {
     }),
   ]);
 
-  store.run(api.bootup);
+  store.run(api.register);
   store.dispatch(fetchUsers());
 
-  await store.run(waitFor(() => actual.ok));
+  await store.run(() =>
+    waitFor(function* () {
+      return actual.ok;
+    }),
+  );
 
   expect(actual).toEqual({
     ok: true,

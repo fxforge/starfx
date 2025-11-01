@@ -1,4 +1,4 @@
-import { sleep } from "effection";
+import { sleep, until } from "effection";
 import { safe } from "../fx/index.js";
 import type { FetchCtx, FetchJsonCtx } from "../query/index.js";
 import { isObject, noop } from "../query/util.js";
@@ -112,7 +112,7 @@ export function* json<CurCtx extends FetchJsonCtx = FetchJsonCtx>(
   const data = yield* safe(() => {
     const resp = ctx.response;
     if (!resp) throw new Error("response is falsy");
-    return resp[ctx.bodyType]();
+    return until(resp[ctx.bodyType]());
   });
 
   if (data.ok) {
@@ -226,7 +226,7 @@ export function* request<CurCtx extends FetchCtx = FetchCtx>(
 
   const { url, ...req } = ctx.req();
   const request = new Request(url, req);
-  const result = yield* safe(fetch(request));
+  const result = yield* safe(() => until(fetch(request)));
   if (result.ok) {
     ctx.response = result.value;
   } else {

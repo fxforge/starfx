@@ -24,12 +24,12 @@ export {
   run,
   sleep,
   spawn,
+  until,
   useAbortSignal,
 } from "effection";
 export type {
   Callable,
   Channel,
-  Instruction,
   Operation,
   Result,
   Scope,

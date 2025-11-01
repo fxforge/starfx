@@ -1,16 +1,15 @@
 import {
   API_ACTION_PREFIX,
-  type AnyState,
   type ApiCtx,
   type Operation,
   call,
-  createAction,
   createApi,
   createKey,
   keepAlive,
   mdw,
   safe,
   takeEvery,
+  until,
   waitFor,
 } from "../index.js";
 import { useCache } from "../react.js";
@@ -82,7 +81,7 @@ test("POST", async () => {
       const buff = yield* safe(() => {
         if (!ctx.response) throw new Error("no response");
         const res = ctx.response.arrayBuffer();
-        return res;
+        return until(res);
       });
 
       if (!buff.ok) {
@@ -102,11 +101,11 @@ test("POST", async () => {
   );
 
   const store = createStore({ initialState: { users: {} } });
-  store.run(query.bootup);
+  store.run(query.register);
 
   store.dispatch(createUser({ email: mockUser.email }));
 
-  await store.run(
+  await store.run(() =>
     waitFor(function* (): Operation<boolean> {
       const res = yield* select((state) => state);
       return (
@@ -165,7 +164,7 @@ test("POST with uri", () => {
   );
 
   const store = createStore({ initialState: { users: {} } });
-  store.run(query.bootup);
+  store.run(query.register);
   store.dispatch(createUser({ email: mockUser.email }));
 });
 
@@ -186,7 +185,7 @@ test("middleware - with request fn", () => {
     query.request({ method: "POST" }),
   );
   const store = createStore({ initialState: { users: {} } });
-  store.run(query.bootup);
+  store.run(query.register);
   store.dispatch(createUser());
 });
 
@@ -215,7 +214,7 @@ test("run() on endpoint action - should run the effect", () => {
   );
 
   const store = createStore({ initialState: { users: {} } });
-  store.run(api.bootup);
+  store.run(api.register);
   store.dispatch(action2());
 });
 
@@ -259,7 +258,7 @@ test("run() from a normal saga", async () => {
   }
 
   const store = createStore({ initialState: { users: {} } });
-  store.run(() => keepAlive([api.bootup, watchAction]));
+  store.run(() => keepAlive([api.register, watchAction]));
   store.dispatch(action2());
 
   await new Promise((resolve) => setTimeout(resolve, 300));
@@ -297,7 +296,7 @@ test("with hash key on a large post", async () => {
         if (!ctx.response) {
           throw new Error("no response");
         }
-        return ctx.response.arrayBuffer();
+        return until(ctx.response.arrayBuffer());
       });
 
       if (!buff.ok) {
@@ -324,11 +323,11 @@ test("with hash key on a large post", async () => {
   const email = `${mockUser.email}9`;
   const largetext = "abc-def-ghi-jkl-mno-pqr".repeat(100);
 
-  store.run(query.bootup);
+  store.run(query.register);
   const action = createUserDefaultKey({ email, largetext });
   store.dispatch(action);
 
-  await store.run(waitForLoader(schema.loaders, action));
+  await store.run(() => waitForLoader(schema.loaders, action));
 
   const s = store.getState();
   const expectedKey = createKey(action.payload.name, {
@@ -359,7 +358,7 @@ test("two identical endpoints", () => {
     yield* next();
   });
 
-  store.run(api.bootup);
+  store.run(api.register);
   store.dispatch(first());
   store.dispatch(second());
 
@@ -397,7 +396,7 @@ test("ensure types for get() endpoint", () => {
   );
 
   const store = createStore({ initialState: { users: {} } });
-  store.run(api.bootup);
+  store.run(api.register);
 
   store.dispatch(action1({ id: "1" }));
   expect(acc).toEqual(["1", "wow"]);
@@ -435,7 +434,7 @@ test("ensure ability to cast `ctx` in function definition", () => {
   );
 
   const store = createStore({ initialState: { users: {} } });
-  store.run(api.bootup);
+  store.run(api.register);
   store.dispatch(action1({ id: "1" }));
   expect(acc).toEqual(["1", "wow"]);
 });
@@ -468,7 +467,7 @@ test("ensure ability to cast `ctx` in function definition with no props", () => 
   );
 
   const store = createStore({ initialState: { users: {} } });
-  store.run(api.bootup);
+  store.run(api.register);
   store.dispatch(action1());
   expect(acc).toEqual(["wow"]);
 });
@@ -496,7 +495,7 @@ test("should bubble up error", () => {
     },
   );
 
-  store.run(api.bootup);
+  store.run(api.register);
   store.dispatch(fetchUser());
   expect(error.message).toBe(
     "Cannot read properties of undefined (reading 'thisKeyDoesNotExist')",
@@ -532,7 +531,7 @@ test("useCache - derive api success from endpoint", () => {
   );
 
   const store = createStore({ initialState: { users: {} } });
-  store.run(api.bootup);
+  store.run(api.register);
 
   function _App() {
     const act = action1();

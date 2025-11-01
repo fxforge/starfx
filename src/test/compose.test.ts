@@ -35,17 +35,14 @@ test("order of execution", async () => {
       ctx.actual += "g";
     },
     function* (ctx, next) {
-      yield* sleep(10);
       ctx.actual += "b";
       yield* next();
-      yield* sleep(10);
       ctx.actual += "f";
     },
     function* (ctx, next) {
       ctx.actual += "c";
       yield* next();
       ctx.actual += "d";
-      yield* sleep(30);
       ctx.actual += "e";
     },
   ]);

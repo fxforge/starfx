@@ -2,7 +2,7 @@ import type { Operation, Result } from "effection";
 import { getIdFromAction, take } from "../action.js";
 import { parallel, safe } from "../fx/index.js";
 import type { ThunkAction } from "../query/index.js";
-import type { ActionFnWithPayload, AnyState } from "../types.js";
+import type { ActionFnWithPayload, AnyState, LoaderState } from "../types.js";
 import { StoreContext } from "./context.js";
 import type { LoaderOutput } from "./slice/loaders.js";
 import type { FxStore, StoreUpdater, UpdaterCtx } from "./types.js";
@@ -33,7 +33,7 @@ export function* select<S, R, P>(
 export function* waitForLoader<M extends AnyState>(
   loaders: LoaderOutput<M, AnyState>,
   action: ThunkAction | ActionFnWithPayload,
-) {
+): Operation<LoaderState<M>> {
   const id = getIdFromAction(action);
   const selector = (s: AnyState) => loaders.selectById(s, { id });
 
@@ -55,10 +55,9 @@ export function* waitForLoader<M extends AnyState>(
 export function* waitForLoaders<M extends AnyState>(
   loaders: LoaderOutput<M, AnyState>,
   actions: (ThunkAction | ActionFnWithPayload)[],
-) {
-  const group = yield* parallel(
-    actions.map((action) => waitForLoader(loaders, action)),
-  );
+): Operation<Result<LoaderState<M>>[]> {
+  const ops = actions.map((action) => () => waitForLoader(loaders, action));
+  const group = yield* parallel<LoaderState<M>>(ops);
   return yield* group;
 }
 
@@ -66,7 +65,9 @@ export function createTracker<T, M extends Record<string, unknown>>(
   loader: LoaderOutput<M, AnyState>,
 ) {
   return (id: string) => {
-    return function* (op: () => Operation<Result<T>>) {
+    return function* (
+      op: () => Operation<Result<T>>,
+    ): Operation<Result<Result<T>>> {
       yield* updateStore(loader.start({ id }));
       const result = yield* safe(op);
       if (result.ok) {

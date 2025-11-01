@@ -1,5 +1,5 @@
 import type { Operation, Result } from "../index.js";
-import { Err, Ok, each, parallel, run, sleep, spawn } from "../index.js";
+import { Err, Ok, each, parallel, run, sleep, spawn, until } from "../index.js";
 import { expect, test } from "../test.js";
 
 interface Defer<T> {
@@ -23,11 +23,11 @@ test("should return an immediate channel with results as they are completed", as
   const result = await run(function* () {
     const results = yield* parallel([
       function* () {
+        // force a delay to ensure order
         yield* sleep(20);
         return "second";
       },
       function* () {
-        yield* sleep(10);
         return "first";
       },
     ]);
@@ -49,11 +49,9 @@ test("should return a sequence channel with results preserving array order as re
   const result = await run(function* () {
     const results = yield* parallel([
       function* () {
-        yield* sleep(20);
         return "second";
       },
       function* () {
-        yield* sleep(10);
         return "first";
       },
     ]);
@@ -75,11 +73,9 @@ test("should return all the result in an array, preserving order", async () => {
   const result = await run(function* () {
     const para = yield* parallel([
       function* () {
-        yield* sleep(20);
         return "second";
       },
       function* () {
-        yield* sleep(10);
         return "first";
       },
     ]);
@@ -103,16 +99,14 @@ test("should resolve all async items", async () => {
   const two = defer();
 
   function* one() {
-    yield* sleep(5);
     return 1;
   }
 
   const result = await run(function* () {
     yield* spawn(function* () {
-      yield* sleep(15);
       two.resolve(2);
     });
-    const results = yield* parallel([one, () => two.promise]);
+    const results = yield* parallel([one, () => until(two.promise)]);
     return yield* results;
   });
 
@@ -126,7 +120,10 @@ test("should stop all operations when there is an error", async () => {
 
   function* genFn() {
     try {
-      const results = yield* parallel([() => one.promise, () => two.promise]);
+      const results = yield* parallel([
+        () => until(one.promise),
+        () => until(two.promise),
+      ]);
       actual = yield* results;
     } catch (_) {
       actual = [Err(new Error("should not get hit"))];

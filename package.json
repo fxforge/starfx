@@ -1,6 +1,6 @@
 {
   "name": "starfx",
-  "version": "0.15.0",
+  "version": "0.16.0-beta.0",
   "description": "A micro-mvc framework for react apps",
   "type": "module",
   "files": ["/dist"],
@@ -27,7 +27,7 @@
   },
   "homepage": "https://github.com/neurosnap/starfx#readme",
   "dependencies": {
-    "effection": "^3.5.0",
+    "effection": "^4.0.0-beta.2",
     "immer": "^10.1.1",
     "reselect": "^5.1.1"
   },

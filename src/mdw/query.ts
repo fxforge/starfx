@@ -1,4 +1,4 @@
-import { type Callable, call } from "effection";
+import { type Operation, call } from "effection";
 import { put } from "../action.js";
 import { compose } from "../compose.js";
 import { safe } from "../fx/index.js";
@@ -141,7 +141,7 @@ export function fetch<CurCtx extends FetchJsonCtx = FetchJsonCtx>(
  * This middleware will only be activated if predicate is true.
  */
 export function predicate<Ctx extends ApiCtx = ApiCtx>(
-  predicate: ((ctx: Ctx) => boolean) | ((ctx: Ctx) => Callable<boolean>),
+  predicate: ((ctx: Ctx) => boolean) | ((ctx: Ctx) => () => Operation<boolean>),
 ) {
   return (mdw: MiddlewareApi) => {
     return function* (ctx: Ctx, next: Next) {

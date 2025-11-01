@@ -2,7 +2,6 @@ import type { Next } from "../types.js";
 import type { ApiName, QueryApi } from "./api-types.js";
 import { createThunks } from "./thunk.js";
 import type { ThunksApi } from "./thunk.js";
-// deno-lint-ignore-file no-explicit-any
 import type { ApiCtx, ApiRequest } from "./types.js";
 
 /**
@@ -65,10 +64,6 @@ export function createApi<Ctx extends ApiCtx = ApiCtx>(
 
   return {
     use: thunks.use,
-    /**
-     * @deprecated use `register()` instead
-     */
-    bootup: thunks.register,
     register: thunks.register,
     create: thunks.create,
     manage: thunks.manage,

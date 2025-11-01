@@ -1,5 +1,5 @@
 import nock from "nock";
-import { type ApiCtx, createApi, mdw, takeEvery } from "../index.js";
+import { type ApiCtx, createApi, mdw, sleep, takeEvery } from "../index.js";
 import {
   createSchema,
   createStore,
@@ -48,12 +48,12 @@ test("should be able to fetch a resource and save automatically", async () => {
     },
   );
 
-  store.run(api.bootup);
+  store.run(api.register);
 
   const action = fetchUsers();
   store.dispatch(action);
 
-  await store.run(waitForLoader(schema.loaders, action));
+  await store.run(() => waitForLoader(schema.loaders, action));
 
   const state = store.getState();
   expect(state.cache[action.payload.key]).toEqual(mockUser);
@@ -90,12 +90,12 @@ test("should be able to fetch a resource and parse as text instead of json", asy
     },
   );
 
-  store.run(api.bootup);
+  store.run(api.register);
 
   const action = fetchUsers();
   store.dispatch(action);
 
-  await store.run(waitForLoader(schema.loaders, action));
+  await store.run(() => waitForLoader(schema.loaders, action));
 
   const data = "this is some text";
   expect(actual).toEqual({ ok: true, value: data });
@@ -123,12 +123,12 @@ test("error handling", async () => {
     },
   );
 
-  store.run(api.bootup);
+  store.run(api.register);
 
   const action = fetchUsers();
   store.dispatch(action);
 
-  await store.run(waitForLoader(schema.loaders, action));
+  await store.run(() => waitForLoader(schema.loaders, action));
 
   const state = store.getState();
   expect(state.cache[action.payload.key]).toEqual(errMsg);
@@ -160,12 +160,12 @@ test("status 204", async () => {
     },
   );
 
-  store.run(api.bootup);
+  store.run(api.register);
 
   const action = fetchUsers();
   store.dispatch(action);
 
-  await store.run(waitForLoader(schema.loaders, action));
+  await store.run(() => waitForLoader(schema.loaders, action));
 
   const state = store.getState();
   expect(state.cache[action.payload.key]).toEqual({});
@@ -198,11 +198,11 @@ test("malformed json", async () => {
     },
   );
 
-  store.run(api.bootup);
+  store.run(api.register);
   const action = fetchUsers();
   store.dispatch(action);
 
-  await store.run(waitForLoader(schema.loaders, action));
+  await store.run(() => waitForLoader(schema.loaders, action));
 
   const data = {
     message: "Unexpected token 'o', \"not json\" is not valid JSON",
@@ -237,11 +237,11 @@ test("POST", async () => {
     },
   );
 
-  store.run(api.bootup);
+  store.run(api.register);
   const action = fetchUsers();
   store.dispatch(action);
 
-  const loader = await store.run(waitForLoader(schema.loaders, action));
+  const loader = await store.run(() => waitForLoader(schema.loaders, action));
   if (!loader.ok) {
     throw loader.error;
   }
@@ -294,16 +294,20 @@ test("POST multiple endpoints with same uri", async () => {
     },
   );
 
-  store.run(api.bootup);
+  store.run(api.register);
 
   const action1 = fetchUsers({ id: "1" });
   const action2 = fetchUsersSecond({ id: "1" });
   store.dispatch(action1);
   store.dispatch(action2);
 
-  const results = await store.run(
-    waitForLoaders(schema.loaders, [action1, action2]),
-  );
+  const results = await store.run(function* () {
+    // it seems to fire the second action before it has subscribed, wait a tick
+    // since this is more than ensuring an order by controlling with an async point
+    // we need to sleep for 10 instead of 0
+    yield* sleep(10);
+    return yield* waitForLoaders(schema.loaders, [action1, action2]);
+  });
   if (!results.ok) {
     throw results.error;
   }
@@ -367,7 +371,7 @@ test("slug in url but payload has empty string for slug value", () => {
     },
   );
 
-  store.run(api.bootup);
+  store.run(api.register);
   const action = fetchUsers({ id: "" });
   store.dispatch(action);
 
@@ -408,12 +412,12 @@ test("with success - should keep retrying fetch request", async () => {
     mdw.fetchRetry((n) => (n > 4 ? -1 : 10)),
   ]);
 
-  store.run(api.bootup);
+  store.run(api.register);
 
   const action = fetchUsers();
   store.dispatch(action);
 
-  const loader = await store.run(waitForLoader(schema.loaders, action));
+  const loader = await store.run(() => waitForLoader(schema.loaders, action));
   if (!loader.ok) {
     throw loader.error;
   }
@@ -443,11 +447,11 @@ test("fetch retry - with failure - should keep retrying and then quit", async ()
     mdw.fetchRetry((n) => (n > 2 ? -1 : 10)),
   ]);
 
-  store.run(api.bootup);
+  store.run(api.register);
   const action = fetchUsers();
   store.dispatch(action);
 
-  const loader = await store.run(waitForLoader(schema.loaders, action));
+  const loader = await store.run(() => waitForLoader(schema.loaders, action));
   if (!loader.ok) {
     throw loader.error;
   }
@@ -471,10 +475,12 @@ test("should *not* make http request and instead simply mock response", async ()
     mdw.response(new Response(JSON.stringify(mockUser))),
   ]);
 
-  store.run(api.bootup);
+  store.run(api.register);
   store.dispatch(fetchUsers());
 
-  const loader = await store.run(waitForLoader(schema.loaders, fetchUsers));
+  const loader = await store.run(() =>
+    waitForLoader(schema.loaders, fetchUsers),
+  );
   if (!loader.ok) {
     throw loader.error;
   }
@@ -497,13 +503,13 @@ test("should use dynamic mdw to mock response", async () => {
     mdw.response(new Response(JSON.stringify(mockUser))),
   ]);
 
-  store.run(api.bootup);
+  store.run(api.register);
 
   // override default response with dynamic mdw
   const dynamicUser = { id: "2", email: "dynamic@starfx.com" };
   fetchUsers.use(mdw.response(new Response(JSON.stringify(dynamicUser))));
   store.dispatch(fetchUsers());
-  let loader = await store.run(waitForLoader(schema.loaders, fetchUsers));
+  let loader = await store.run(() => waitForLoader(schema.loaders, fetchUsers));
   if (!loader.ok) {
     throw loader.error;
   }
@@ -512,7 +518,7 @@ test("should use dynamic mdw to mock response", async () => {
   // reset dynamic mdw and try again
   api.reset();
   store.dispatch(fetchUsers());
-  loader = await store.run(waitForLoader(schema.loaders, fetchUsers));
+  loader = await store.run(() => waitForLoader(schema.loaders, fetchUsers));
   if (!loader.ok) {
     throw loader.error;
   }

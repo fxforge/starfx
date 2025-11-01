@@ -4,6 +4,7 @@ import {
   createScope,
   parallel,
   put,
+  sleep,
   take,
 } from "../index.js";
 import {
@@ -75,6 +76,8 @@ test("update store and receives update from channel `StoreUpdateContext`", async
         yield* msgList.next();
       },
       function* () {
+        // TODO we may need to consider how to handle this, is it a breaking change?
+        yield* sleep(0);
         yield* updateStore(updateUser({ id: "1", name: "eric" }));
       },
     ]);
@@ -127,6 +130,8 @@ test("emit Action and update store", async () => {
         yield* updateStore(updateUser(action.payload));
       },
       function* () {
+        // TODO we may need to consider how to handle this, is it a breaking change?
+        yield* sleep(0);
         yield* put({ type: "UPDATE_USER", payload: { id: "1", name: "eric" } });
       },
     ]);
@@ -166,7 +171,7 @@ test("resets store", async () => {
     dev: true,
   });
 
-  await store.run(store.reset(["users"]));
+  await store.run(() => store.reset(["users"]));
 
   expect(store.getState()).toEqual({
     users: { 3: { id: "3", name: "hehe" } },

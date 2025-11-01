@@ -1,5 +1,4 @@
-import { type Callable, type Operation, sleep } from "effection";
-import type { Result } from "effection"; // Adjust the import path as needed
+import { type Operation, type Result, sleep } from "effection";
 import { API_ACTION_PREFIX, put } from "../action.js";
 import { parallel } from "./parallel.js";
 import { safe } from "./safe.js";
@@ -17,8 +16,8 @@ export function superviseBackoff(attempt: number, max = 10): number {
  * error simply calling the {@link Operation} then it will exponentially
  * wait longer until attempting to restart and eventually give up.
  */
-export function supervise<T>(
-  op: Callable<T>,
+export function supervise<T, TArgs extends unknown[] = []>(
+  op: (...args: TArgs) => Operation<T>,
   backoff: (attemp: number) => number = superviseBackoff,
 ) {
   return function* (): Operation<void> {
@@ -49,11 +48,12 @@ export function supervise<T>(
  * keepAlive accepts a list of operations and calls them all with
  * {@link supervise}
  */
-export function* keepAlive(
-  ops: Callable<unknown>[],
+export function* keepAlive<T, TArgs extends unknown[] = []>(
+  ops: ((...args: TArgs) => Operation<T>)[],
   backoff?: (attempt: number) => number,
 ): Operation<Result<void>[]> {
-  const group = yield* parallel(ops.map((op) => supervise(op, backoff)));
+  const supervised = ops.map((op) => supervise(op, backoff));
+  const group = yield* parallel(supervised);
   const results = yield* group;
   return results;
 }

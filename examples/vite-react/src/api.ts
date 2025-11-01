@@ -32,7 +32,7 @@ export const fetchUsers = api.get<never, Omit<User,"age">[]>(
 
     console.log("guesser.expect")
     const g = yield* Guesser.get()
-    console.log(g, Guesser.key, Guesser)
+    console.log(g, Guesser)
 
     const users = {} as Record<string, User>
     for (const user of ctx.json.value) {

@@ -33,10 +33,10 @@ api.use(mdw.fetch({ baseUrl: "https://api.github.com" }));
 const fetchRepo = api.get(
   "/repos/neurosnap/starfx",
   { supervisor: timer() },
-  api.cache(),
+  api.cache()
 );
 
-store.run(api.bootup);
+store.run(api.register);
 
 function App() {
   return (

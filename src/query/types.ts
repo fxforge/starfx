@@ -8,7 +8,7 @@ import type {
   Payload,
 } from "../types.js";
 
-type IfAny<T, Y, N> = 0 extends 1 & T ? Y : N;
+export type IfAny<T, Y, N> = 0 extends 1 & T ? Y : N;
 
 export interface ThunkCtx<P = any> extends Payload<P> {
   name: string;

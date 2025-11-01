@@ -9,11 +9,12 @@ export function createBatchMdw<S extends AnyState>(
   return function* batchMdw(_: UpdaterCtx<S>, next: Next) {
     if (!notifying) {
       notifying = true;
-      yield* action<void>(function* (resolve) {
+      yield* action<void>((resolve) => {
         queue(() => {
           notifying = false;
           resolve();
         });
+        return () => {};
       });
       yield* next();
     }

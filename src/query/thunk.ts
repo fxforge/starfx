@@ -1,5 +1,4 @@
 import {
-  type Callable,
   type Context,
   Ok,
   type Operation,
@@ -17,7 +16,7 @@ import { createKey } from "./create-key.js";
 import { isFn, isObject } from "./util.js";
 
 import { IdContext } from "../store/store.js";
-import type { ActionWithPayload, Next, Payload } from "../types.js";
+import type { ActionWithPayload, AnyAction, Next, Payload } from "../types.js";
 import type {
   CreateAction,
   CreateActionPayload,
@@ -31,8 +30,7 @@ import type {
 export interface ThunksApi<Ctx extends ThunkCtx> {
   use: (fn: Middleware<Ctx>) => void;
   routes: () => Middleware<Ctx>;
-  bootup: Callable<void>;
-  register: Callable<void>;
+  register: () => Operation<void>;
   reset: () => void;
   manage: <Resource>(
     name: string,
@@ -158,7 +156,7 @@ export function createThunks<Ctx extends ThunkCtx = ThunkCtx<any>>(
   const createType = (post: string) => `${API_ACTION_PREFIX}${post}`;
 
   function* onApi<P extends CreateActionPayload>(
-    action: ActionWithPayload<P>,
+    action: ActionWithPayload<P> | AnyAction,
   ): Operation<Ctx> {
     const { name, key, options } = action.payload;
     const actionFn = actionMap[name];
@@ -185,8 +183,8 @@ export function createThunks<Ctx extends ThunkCtx = ThunkCtx<any>>(
     const action = (payload?: any) => {
       return { type, payload };
     };
-    let req = null;
-    let fn: any = null;
+    let req: { supervisor?: Supervisor } | null = null;
+    let fn: MiddlewareCo<Ctx> | null = null;
     if (args.length === 2) {
       req = args[0];
       fn = args[1];
@@ -214,7 +212,7 @@ export function createThunks<Ctx extends ThunkCtx = ThunkCtx<any>>(
 
     middlewareMap[name] = fn || defaultMiddleware;
 
-    const tt = req ? (req as any).supervisor : supervisor;
+    const tt = req?.supervisor ? req.supervisor : supervisor;
     function* curVisor(): Operation<void> {
       yield* tt(type, onApi);
     }
@@ -325,10 +323,6 @@ export function createThunks<Ctx extends ThunkCtx = ThunkCtx<any>>(
     create,
     manage,
     routes,
-    /**
-     * @deprecated use `register()` instead
-     */
-    bootup: register,
     reset: resetMdw,
     register,
   };

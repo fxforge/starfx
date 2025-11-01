@@ -11,12 +11,27 @@ import {
 import { createStore, updateStore } from "../store/index.js";
 import { describe, expect, test } from "../test.js";
 
-import type { Next, Operation, ThunkCtx } from "../index.js";
-// deno-lint-ignore no-explicit-any
+import type {
+  CreateAction,
+  CreateActionWithPayload,
+  Next,
+  Operation,
+  ThunkCtx,
+} from "../index.js";
+import type { IfAny } from "../query/types.js";
+
 interface RoboCtx<D = Record<string, unknown>, P = any> extends ThunkCtx<P> {
   url: string;
   request: { method: string; body?: Record<string, unknown> };
   response: D;
+  name: string;
+  key: string;
+  action: any;
+  actionFn: IfAny<
+    P,
+    CreateAction<ThunkCtx<any>, any>,
+    CreateActionWithPayload<ThunkCtx<P>, P, any>
+  >;
 }
 
 interface User {
@@ -415,7 +430,11 @@ test("middleware order of execution", async () => {
   store.run(api.register);
   store.dispatch(action());
 
-  await store.run(waitFor(() => acc === "abcdefg"));
+  await store.run(function* () {
+    return yield* waitFor(function* () {
+      return acc === "abcdefg";
+    });
+  });
   expect(acc).toBe("abcdefg");
 });
 
@@ -445,7 +464,11 @@ test("retry with actionFn", async () => {
   store.run(api.register);
   store.dispatch(action());
 
-  await store.run(waitFor(() => acc === "agag"));
+  await store.run(function* () {
+    return yield* waitFor(function* () {
+      return acc === "agag";
+    });
+  });
   expect(acc).toBe("agag");
 });
 
@@ -476,7 +499,11 @@ test("retry with actionFn with payload", async () => {
   store.run(api.register);
   store.dispatch(action({ page: 1 }));
 
-  await store.run(waitFor(() => acc === "agag"));
+  await store.run(function* () {
+    return yield* waitFor(function* () {
+      return acc === "agag";
+    });
+  });
   expect(acc).toBe("agag");
 });
 

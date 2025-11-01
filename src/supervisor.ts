@@ -1,12 +1,4 @@
-import {
-  type Callable,
-  type Operation,
-  type Task,
-  call,
-  race,
-  sleep,
-  spawn,
-} from "effection";
+import { type Operation, type Task, call, race, sleep, spawn } from "effection";
 import { createAction, take } from "./action.js";
 import { getIdFromAction } from "./action.js";
 import type { CreateActionPayload } from "./query/index.js";
@@ -55,7 +47,7 @@ export const clearTimers = createAction<
 export function timer(timer: number = 5 * MINUTES) {
   return function* onTimer(
     actionType: string,
-    op: (action: AnyAction) => Callable<unknown>,
+    op: (action: AnyAction) => Operation<unknown>,
   ) {
     const map: { [key: string]: Task<unknown> } = {};
 

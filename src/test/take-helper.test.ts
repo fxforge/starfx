@@ -1,4 +1,4 @@
-import { spawn } from "effection";
+import { spawn, suspend } from "effection";
 import type { AnyAction } from "../index.js";
 import { sleep, take, takeEvery, takeLatest, takeLeading } from "../index.js";
 import { createStore } from "../store/index.js";
@@ -8,7 +8,8 @@ test("should cancel previous tasks and only use latest", async () => {
   const actual: string[] = [];
   function* worker(action: AnyAction) {
     if (action.payload !== "3") {
-      yield* sleep(3000);
+      // TODO why is this needed?
+      yield* sleep(0);
     }
     actual.push(action.payload);
   }
@@ -36,12 +37,14 @@ test("should keep first action and discard the rest", async () => {
   const actual: string[] = [];
   function* worker(action: AnyAction) {
     called += 1;
-    yield* sleep(100);
+    // TODO why is this needed?
+    yield* sleep(0);
     actual.push(action.payload);
   }
 
   function* root() {
     const task = yield* spawn(() => takeLeading("ACTION", worker));
+    // wait until following dispatches have been processed
     yield* sleep(150);
     yield* task.halt();
   }

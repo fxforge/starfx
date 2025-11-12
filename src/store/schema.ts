@@ -11,7 +11,6 @@ export function createSchema<
 >(slices: O = defaultSchema<O>()): [FxSchema<S, O>, S] {
   const db = Object.keys(slices).reduce<FxSchema<S, O>>(
     (acc, key) => {
-      // deno-lint-ignore no-explicit-any
       (acc as any)[key] = slices[key](key);
       return acc;
     },
@@ -19,7 +18,6 @@ export function createSchema<
   );
 
   const initialState = Object.keys(db).reduce((acc, key) => {
-    // deno-lint-ignore no-explicit-any
     (acc as any)[key] = db[key].initialState;
     return acc;
   }, {}) as S;

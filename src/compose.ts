@@ -2,7 +2,6 @@ import type { Operation } from "effection";
 import type { Next } from "./types.js";
 
 export interface BaseCtx {
-  // deno-lint-ignore no-explicit-any
   [key: string]: any;
 }
 

@@ -48,11 +48,9 @@ export interface FxStore<S extends AnyState> {
   update: (u: StoreUpdater<S> | StoreUpdater<S>[]) => Operation<UpdaterCtx<S>>;
   reset: (ignoreList?: (keyof S)[]) => Operation<UpdaterCtx<S>>;
   run: ReturnType<typeof createRun>;
-  // deno-lint-ignore no-explicit-any
   dispatch: (a: AnyAction | AnyAction[]) => any;
   replaceReducer: (r: (s: S, a: AnyAction) => S) => void;
   getInitialState: () => S;
-  // deno-lint-ignore no-explicit-any
   [Symbol.observable]: () => any;
 }
 

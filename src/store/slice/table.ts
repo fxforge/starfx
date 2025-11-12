@@ -142,7 +142,6 @@ export function createTable<
       });
     },
     set: (entities) => (s) => {
-      // deno-lint-ignore no-explicit-any
       (s as any)[name] = entities;
     },
     remove: (ids) => (s) => {
@@ -164,19 +163,15 @@ export function createTable<
         Object.keys(entity).forEach((prop) => {
           const val = entity[prop];
           if (Array.isArray(val)) {
-            // deno-lint-ignore no-explicit-any
             const list = val as any[];
-            // deno-lint-ignore no-explicit-any
             (state as any)[id][prop].push(...list);
           } else {
-            // deno-lint-ignore no-explicit-any
             (state as any)[id][prop] = entities[id][prop];
           }
         });
       });
     },
     reset: () => (s) => {
-      // deno-lint-ignore no-explicit-any
       (s as any)[name] = initialState;
     },
     ...selectors,

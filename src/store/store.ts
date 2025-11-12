@@ -81,7 +81,6 @@ export function createStore<S extends AnyState>({
 
     const [nextState, patches, _] = produceWithPatches(getState(), (draft) => {
       // TODO: check for return value inside updater
-      // deno-lint-ignore no-explicit-any
       upds.forEach((updater) => updater(draft as any));
     });
     ctx.patches = patches;
@@ -178,7 +177,6 @@ export function createStore<S extends AnyState>({
     // refer to pieces of business logic -- that can also mutate state
     dispatch,
     // stubs so `react-redux` is happy
-    // deno-lint-ignore no-explicit-any
     replaceReducer<S = any>(
       _nextReducer: (_s: S, _a: AnyAction) => void,
     ): void {

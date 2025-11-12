@@ -23,27 +23,22 @@ export function createNum<S extends AnyState = AnyState>({
     schema: "num",
     initialState,
     set: (value) => (state) => {
-      // deno-lint-ignore no-explicit-any
       (state as any)[name] = value;
     },
     increment:
       (by = 1) =>
       (state) => {
-        // deno-lint-ignore no-explicit-any
         (state as any)[name] += by;
       },
     decrement:
       (by = 1) =>
       (state) => {
-        // deno-lint-ignore no-explicit-any
         (state as any)[name] -= by;
       },
     reset: () => (state) => {
-      // deno-lint-ignore no-explicit-any
       (state as any)[name] = initialState;
     },
     select: (state) => {
-      // deno-lint-ignore no-explicit-any
       return (state as any)[name];
     },
   };

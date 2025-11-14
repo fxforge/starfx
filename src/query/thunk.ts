@@ -4,7 +4,6 @@ import {
   type Operation,
   type Scope,
   createContext,
-  createSignal,
   each,
   ensure,
   useScope,
@@ -15,6 +14,7 @@ import { supervise } from "../fx/index.js";
 import { createKey } from "./create-key.js";
 import { isFn, isObject } from "./util.js";
 
+import { createReplaySignal } from "../fx/replay-signal.js";
 import { IdContext } from "../store/store.js";
 import type { ActionWithPayload, AnyAction, Next, Payload } from "../types.js";
 import type {
@@ -139,10 +139,9 @@ export function createThunks<Ctx extends ThunkCtx = ThunkCtx<any>>(
   } = { supervisor: takeEvery },
 ): ThunksApi<Ctx> {
   const storeRegistration = new Set();
-  const watch = createSignal<Visors>();
+  const watch = createReplaySignal<Visors, void>();
 
   const middleware: Middleware<Ctx>[] = [];
-  const visors: { [key: string]: Visors } = {};
   const middlewareMap: { [key: string]: Middleware<Ctx> } = {};
   let dynamicMiddlewareMap: { [key: string]: Middleware<Ctx> } = {};
   const actionMap: {
@@ -174,7 +173,7 @@ export function createThunks<Ctx extends ThunkCtx = ThunkCtx<any>>(
   }
 
   function create(name: string, ...args: any[]) {
-    if (visors[name]) {
+    if (actionMap[name]) {
       const msg = `[${name}] already exists, do you have two thunks with the same name?`;
       console.warn(msg);
     }
@@ -216,10 +215,6 @@ export function createThunks<Ctx extends ThunkCtx = ThunkCtx<any>>(
     function* curVisor(): Operation<void> {
       yield* tt(type, onApi);
     }
-
-    // maintains a history for any future registration
-    visors[name] = () => supervise(curVisor);
-    // signals for any stores already listening
     watch.send(() => supervise(curVisor));
 
     const errMsg = `[${name}] is being called before its thunk has been registered. Run \`store.run(thunks.register)\` where \`thunks\` is the name of your \`createThunks\` or \`createApi\` variable.`;
@@ -262,9 +257,6 @@ export function createThunks<Ctx extends ThunkCtx = ThunkCtx<any>>(
       return kickoff;
     }
 
-    // maintains a history for any future registration
-    visors[name] = curVisor;
-    // signals for any stores already listening
     watch.send(curVisor);
 
     // returns to the user can use this resource from
@@ -284,11 +276,6 @@ export function createThunks<Ctx extends ThunkCtx = ThunkCtx<any>>(
     yield* ensure(function* () {
       storeRegistration.delete(parentStoreId);
     });
-
-    // Register any thunks created before listening to signal
-    for (const created of Object.values(visors)) {
-      yield* scope.spawn(created(scope));
-    }
 
     // wait for further thunk create
     for (const watched of yield* each(watch)) {

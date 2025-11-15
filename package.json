@@ -3,7 +3,9 @@
   "version": "0.16.0-beta.0",
   "description": "A micro-mvc framework for react apps",
   "type": "module",
-  "files": ["/dist"],
+  "files": [
+    "/dist"
+  ],
   "sideEffects": false,
   "main": "./dist/cjs/index.js",
   "types": "./dist/types/index.d.ts",
@@ -79,6 +81,16 @@
       "require": {
         "types": "./dist/types/react.d.ts",
         "default": "./dist/cjs/react.js"
+      }
+    },
+    "./effection": {
+      "import": {
+        "types": "./dist/types/effection.d.ts",
+        "default": "./dist/esm/effection.js"
+      },
+      "require": {
+        "types": "./dist/types/effection.d.ts",
+        "default": "./dist/cjs/effection.js"
       }
     },
     "./package.json": "./package.json"

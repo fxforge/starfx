@@ -74,7 +74,7 @@ export function* take(pattern: ActionPattern): Operation<Action> {
 export function* takeEvery<T>(
   pattern: ActionPattern,
   op: (action: AnyAction) => Operation<T>,
-) {
+): Operation<void> {
   const fd = useActions(pattern);
   for (const action of yield* each(fd)) {
     yield* spawn(() => op(action));
@@ -85,7 +85,7 @@ export function* takeEvery<T>(
 export function* takeLatest<T>(
   pattern: ActionPattern,
   op: (action: AnyAction) => Operation<T>,
-) {
+): Operation<void> {
   const fd = useActions(pattern);
   let lastTask;
 
@@ -101,14 +101,14 @@ export function* takeLatest<T>(
 export function* takeLeading<T>(
   pattern: ActionPattern,
   op: (action: AnyAction) => Operation<T>,
-) {
+): Operation<void> {
   while (true) {
     const action = yield* take(pattern);
     yield* call(() => op(action));
   }
 }
 
-export function* waitFor(predicate: () => Operation<boolean>) {
+export function* waitFor(predicate: () => Operation<boolean>): Operation<void> {
   const init = yield* predicate();
   if (init) {
     return;

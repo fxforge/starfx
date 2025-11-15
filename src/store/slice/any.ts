@@ -21,15 +21,12 @@ export function createAny<V, S extends AnyState = AnyState>({
     name: name as string,
     initialState,
     set: (value) => (state) => {
-      // deno-lint-ignore no-explicit-any
       (state as any)[name] = value;
     },
     reset: () => (state) => {
-      // deno-lint-ignore no-explicit-any
       (state as any)[name] = initialState;
     },
     select: (state) => {
-      // deno-lint-ignore no-explicit-any
       return (state as any)[name];
     },
   };

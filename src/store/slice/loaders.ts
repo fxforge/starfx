@@ -168,7 +168,6 @@ export const createLoaders = <
       });
     },
     reset: () => (s) => {
-      // deno-lint-ignore no-explicit-any
       (s as any)[name] = initialState;
     },
     resetByIds: (ids: string[]) => (s) => {

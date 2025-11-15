@@ -1,6 +1,5 @@
 import { isObject } from "./util.js";
 
-// deno-lint-ignore no-explicit-any
 const deepSortObject = (opts?: any) => {
   if (!isObject(opts)) return opts;
   return Object.keys(opts)
@@ -34,7 +33,6 @@ const tinySimpleHash = (s: string) => {
 /**
  * This function used to set `ctx.key`
  */
-// deno-lint-ignore no-explicit-any
 export const createKey = (name: string, payload?: any) => {
   const normJsonString =
     typeof payload !== "undefined"

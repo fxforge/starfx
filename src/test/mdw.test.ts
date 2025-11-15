@@ -29,7 +29,6 @@ const emptyUser: User = { id: "", name: "", email: "" };
 const mockUser: User = { id: "1", name: "test", email: "test@test.com" };
 const mockUser2: User = { id: "2", name: "two", email: "two@test.com" };
 
-// deno-lint-ignore no-explicit-any
 const jsonBlob = (data: any) => {
   return JSON.stringify(data);
 };

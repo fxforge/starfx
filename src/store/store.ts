@@ -1,6 +1,9 @@
 import {
+  type Callable,
   Ok,
+  type Result,
   type Scope,
+  type Task,
   createContext,
   createScope,
   createSignal,
@@ -32,43 +35,23 @@ export interface CreateStore<S extends AnyState> {
   scope?: Scope;
   initialState: S;
   middleware?: BaseMiddleware<UpdaterCtx<S>>[];
+  setStoreUpdater?: (
+    setState: (state: S) => void,
+    getState: () => S,
+    getInitialState?: () => S,
+  ) => {
+    updateMdw: BaseMiddleware<UpdaterCtx<S>>;
+    initializeStore: Callable<any>;
+  };
 }
 
 export const IdContext = createContext("starfx:id", 0);
 
-export function createStore<S extends AnyState>({
-  initialState,
-  scope: initScope,
-  middleware = [],
-}: CreateStore<S>): FxStore<S> {
-  let scope: Scope;
-  if (initScope) {
-    scope = initScope;
-  } else {
-    const tuple = createScope();
-    scope = tuple[0];
-  }
-
-  let state = initialState;
-  const listeners = new Set<Listener>();
+const defaultStoreUpdater = <S extends AnyState, T>(
+  setState: (state: S) => void,
+  getState: () => S,
+) => {
   enablePatches();
-
-  const signal = createSignal<AnyAction, void>();
-  scope.set(ActionContext, signal);
-  scope.set(IdContext, id++);
-
-  function getScope() {
-    return scope;
-  }
-
-  function getState() {
-    return state;
-  }
-
-  function subscribe(fn: Listener) {
-    listeners.add(fn);
-    return () => listeners.delete(fn);
-  }
 
   function* updateMdw(ctx: UpdaterCtx<S>, next: Next) {
     const upds: StoreUpdater<S>[] = [];
@@ -86,9 +69,59 @@ export function createStore<S extends AnyState>({
     ctx.patches = patches;
 
     // set the state!
-    state = nextState;
+    setState(nextState);
 
     yield* next();
+  }
+
+  const initializeStore = function* () {};
+  return { updateMdw, initializeStore };
+};
+
+export function createStore<S extends AnyState, T>({
+  initialState,
+  scope: initScope,
+  middleware = [],
+  setStoreUpdater = defaultStoreUpdater,
+}: CreateStore<S>): FxStore<S> {
+  let scope: Scope;
+  if (initScope) {
+    scope = initScope;
+  } else {
+    const tuple = createScope();
+    scope = tuple[0];
+  }
+
+  let state = initialState;
+  const listeners = new Set<Listener>();
+
+  const signal = createSignal<AnyAction, void>();
+  scope.set(ActionContext, signal);
+  scope.set(IdContext, id++);
+
+  function getScope() {
+    return scope;
+  }
+
+  function getState() {
+    return state;
+  }
+
+  function setState(newState: S) {
+    state = newState;
+  }
+
+  function getInitialState() {
+    return initialState;
+  }
+
+  function subscribe(fn: Listener) {
+    listeners.add(fn);
+    return () => listeners.delete(fn);
+  }
+
+  function dispatch(action: AnyAction | AnyAction[]) {
+    emit({ signal, action });
   }
 
   function* logMdw(ctx: UpdaterCtx<S>, next: Next) {
@@ -110,6 +143,11 @@ export function createStore<S extends AnyState>({
     yield* next();
   }
 
+  const { updateMdw, initializeStore } = setStoreUpdater(
+    setState,
+    getState,
+    getInitialState,
+  );
   function createUpdater() {
     const fn = compose<UpdaterCtx<S>>([
       updateMdw,
@@ -142,14 +180,6 @@ export function createStore<S extends AnyState>({
     return ctx;
   }
 
-  function dispatch(action: AnyAction | AnyAction[]) {
-    emit({ signal, action });
-  }
-
-  function getInitialState() {
-    return initialState;
-  }
-
   function* reset(ignoreList: (keyof S)[] = []) {
     return yield* update((s) => {
       const keep = ignoreList.reduce<S>(
@@ -166,13 +196,24 @@ export function createStore<S extends AnyState>({
     });
   }
 
+  const run = createRun(scope);
+
+  function initialize<T>(op: Callable<T> | Callable<T>[]): Task<Result<T>[]> {
+    const ops = Array.isArray(op)
+      ? ([initializeStore].concat(op) as Callable<T>[])
+      : [initializeStore, op];
+    return run(ops);
+  }
+
   const store: FxStore<S> = {
     getScope,
     getState,
     subscribe,
+    //@ts-expect-error
+    initialize,
     update,
     reset,
-    run: createRun(scope),
+    run,
     // instead of actions relating to store mutation, they
     // refer to pieces of business logic -- that can also mutate state
     dispatch,

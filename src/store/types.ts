@@ -48,6 +48,7 @@ export interface FxStore<S extends AnyState> {
   update: (u: StoreUpdater<S> | StoreUpdater<S>[]) => Operation<UpdaterCtx<S>>;
   reset: (ignoreList?: (keyof S)[]) => Operation<UpdaterCtx<S>>;
   run: ReturnType<typeof createRun>;
+  initialize: ReturnType<typeof createRun>; //<T>(op: Callable<T>[]) => Operation<Result<T>[]>;
   dispatch: (a: AnyAction | AnyAction[]) => any;
   replaceReducer: (r: (s: S, a: AnyAction) => S) => void;
   getInitialState: () => S;

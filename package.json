@@ -81,6 +81,16 @@
         "default": "./dist/cjs/react.js"
       }
     },
+    "./effection": {
+      "import": {
+        "types": "./dist/types/effection.d.ts",
+        "default": "./dist/esm/effection.js"
+      },
+      "require": {
+        "types": "./dist/types/effection.d.ts",
+        "default": "./dist/cjs/effection.js"
+      }
+    },
     "./package.json": "./package.json"
   }
 }

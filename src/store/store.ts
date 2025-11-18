@@ -39,6 +39,7 @@ export interface CreateStore<S extends AnyState> {
   setStoreUpdater?: (
     setState: (state: S) => void,
     getState: () => S,
+    getScope: () => Scope,
     getInitialState?: () => S,
   ) => {
     updateMdw: BaseMiddleware<UpdaterCtx<S>>;
@@ -147,15 +148,16 @@ export function createStore<S extends AnyState, T>({
   const { updateMdw, initializeStore } = setStoreUpdater(
     setState,
     getState,
+    getScope,
     getInitialState,
   );
   const mdw = compose<UpdaterCtx<S>>([
-      updateMdw,
-      ...middleware,
-      logMdw,
-      notifyChannelMdw,
-      notifyListenersMdw,
-    ]);
+    updateMdw,
+    ...middleware,
+    logMdw,
+    notifyChannelMdw,
+    notifyListenersMdw,
+  ]);
 
   function* update(updater: StoreUpdater<S> | StoreUpdater<S>[]) {
     const ctx = {

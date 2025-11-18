@@ -7,6 +7,7 @@ import {
   createContext,
   createScope,
   createSignal,
+  lift,
 } from "effection";
 import { enablePatches, produceWithPatches } from "immer";
 import { API_ACTION_PREFIX, ActionContext, emit } from "../action.js";
@@ -125,7 +126,7 @@ export function createStore<S extends AnyState, T>({
   }
 
   function* logMdw(ctx: UpdaterCtx<S>, next: Next) {
-    dispatch({
+    yield* lift(dispatch)({
       type: `${API_ACTION_PREFIX}store`,
       payload: ctx,
     });
@@ -148,8 +149,7 @@ export function createStore<S extends AnyState, T>({
     getState,
     getInitialState,
   );
-  function createUpdater() {
-    const fn = compose<UpdaterCtx<S>>([
+  const mdw = compose<UpdaterCtx<S>>([
       updateMdw,
       ...middleware,
       logMdw,
@@ -157,10 +157,6 @@ export function createStore<S extends AnyState, T>({
       notifyListenersMdw,
     ]);
 
-    return fn;
-  }
-
-  const mdw = createUpdater();
   function* update(updater: StoreUpdater<S> | StoreUpdater<S>[]) {
     const ctx = {
       updater,
@@ -171,7 +167,7 @@ export function createStore<S extends AnyState, T>({
     yield* mdw(ctx);
 
     if (!ctx.result.ok) {
-      dispatch({
+      yield* lift(dispatch)({
         type: `${API_ACTION_PREFIX}store`,
         payload: ctx.result.error,
       });

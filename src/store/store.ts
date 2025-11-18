@@ -1,7 +1,7 @@
 import {
   type Callable,
   Ok,
-  type Result,
+  type Operation,
   type Scope,
   type Task,
   createContext,
@@ -194,18 +194,17 @@ export function createStore<S extends AnyState, T>({
 
   const run = createRun(scope);
 
-  function initialize<T>(op: Callable<T> | Callable<T>[]): Task<Result<T>[]> {
-    const ops = Array.isArray(op)
-      ? ([initializeStore].concat(op) as Callable<T>[])
-      : [initializeStore, op];
-    return run(ops);
+  function initialize<T>(op: () => Operation<T>): Task<void> {
+    return scope.run(function* (): Operation<void> {
+      yield* initializeStore();
+      yield* op();
+    });
   }
 
   const store: FxStore<S> = {
     getScope,
     getState,
     subscribe,
-    //@ts-expect-error
     initialize,
     update,
     reset,

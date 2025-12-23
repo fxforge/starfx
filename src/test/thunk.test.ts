@@ -656,13 +656,23 @@ test("should allow multiple stores to register a thunk", () => {
 });
 
 describe(".manage", () => {
-  function guessAge(): Operation<{ guess: number }> {
+  function guessAge(): Operation<{ guess: number; cumulative: null | number }> {
     return resource(function* (provide) {
-      yield* provide({
-        get guess() {
-          return Math.floor(Math.random() * 100);
-        },
-      });
+      let cumulative = 0 as null | number;
+      try {
+        yield* provide({
+          get guess() {
+            const random = Math.floor(Math.random() * 100);
+            if (cumulative !== null) cumulative += random;
+            return random;
+          },
+          get cumulative() {
+            return cumulative;
+          },
+        });
+      } finally {
+        cumulative = null;
+      }
     });
   }
 
@@ -704,21 +714,24 @@ describe(".manage", () => {
   });
 
   test("uses resource", () => {
-    expect.assertions(1);
+    expect.assertions(2);
 
     const thunk = createThunks<RoboCtx>();
     thunk.use(thunk.routes());
     const TestContext = thunk.manage("test:context", guessAge());
     const store = createStore({ initialState: {} });
     store.run(thunk.register);
+    let guess = 0;
     let acc = 0;
     const action = thunk.create("/users", function* (payload, next) {
       const c = yield* TestContext.expect();
-      acc += c.guess;
+      guess += c.guess;
+      acc += c.cumulative ?? 0;
       next();
     });
     store.dispatch(action());
 
-    expect(acc).toBeGreaterThan(0);
+    expect(guess).toBeGreaterThan(0);
+    expect(acc).toEqual(guess);
   });
 });

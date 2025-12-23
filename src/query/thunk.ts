@@ -6,6 +6,7 @@ import {
   createContext,
   each,
   ensure,
+  suspend,
   useScope,
 } from "effection";
 import { API_ACTION_PREFIX, takeEvery } from "../action.js";
@@ -247,19 +248,19 @@ export function createThunks<Ctx extends ThunkCtx = ThunkCtx<any>>(
     return actionFn;
   }
 
-  function manage<Resource>(name: string, resource: Operation<Resource>) {
+  function manage<Resource>(name: string, inputResource: Operation<Resource>) {
     const CustomContext = createContext<Resource>(name);
     function curVisor(scope: Scope) {
-      function* kickoff(): Operation<void> {
-        const providedResource = yield* resource;
+      return function* () {
+        const providedResource = yield* inputResource;
         scope.set(CustomContext, providedResource);
-      }
-      return kickoff;
+        yield* suspend();
+      };
     }
 
     watch.send(curVisor);
 
-    // returns to the user can use this resource from
+    // returns to the user so they can use this resource from
     //  anywhere this context is available
     return CustomContext;
   }

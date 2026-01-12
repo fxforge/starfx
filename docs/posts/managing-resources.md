@@ -7,7 +7,9 @@ description: How to use .manage() to register effection resources with store/thu
 
 `starfx` supports managing Effection `resource`s and exposing them via a `Context` using the `.manage()` helper on `store`, `thunks` (from `createThunks`) and `api` (from `createApi`). The `manage` call will start the resource inside the scope and return a `Context` you can `get()` or `expect()` inside your operations to access the provided value.
 
-A `resource` is useful in encapsulating logic or functionality. It is particularly useful for managing connections such as a WebSocket connections, Web Workers, auth or telemetry. These processes can be wired up, including failure, restart and shutdown logic, and then used in any of your actions.
+A `resource` is useful in encapsulating logic or functionality. It is particularly useful for managing connections such as a WebSocket connections, Web Workers, auth or telemetry. These processes can be wired up, including failure, restart and shutdown logic, and then used in any of your actions. See the [`effectionx` repo](https://github.com/thefrontside/effectionx) for published packages around an effection `resource` and examples.
+
+Note: when using this API at the store, you need to use the new `store.initialize()` API to ensure that the resources are properly started. If you don't make use of `store.manage()`, this is not a required at this time, but `store.run()` for initial startup will be deprecated in the future preferring `store.initialize()`.
 
 Example (contrived) pattern:
 
@@ -18,6 +20,7 @@ function guessAge(): Operation<{ guess: number; cumulative: number | null }> {
   return resource(function* (provide) {
     let cumulative: number | null = 0;
     try {
+      // this wouldn't be valuable per se, but demonstrates how the functionality is exposed
       yield* provide({
         get guess() {
           const n = Math.floor(Math.random() * 100);
@@ -56,7 +59,7 @@ const action = thunks.create("do-thing", function* (ctx, next) {
   yield* next();
 });
 
-store.run(thunks.register);
+store.initilize(thunks.register);
 store.dispatch(action());
 ```
 

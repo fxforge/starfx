@@ -1,13 +1,19 @@
 import {
   Ok,
+  type Operation,
   type Scope,
+  type Task,
   createContext,
   createScope,
   createSignal,
+  each,
+  lift,
+  suspend,
 } from "effection";
 import { enablePatches, produceWithPatches } from "immer";
 import { API_ACTION_PREFIX, ActionContext, emit } from "../action.js";
 import { type BaseMiddleware, compose } from "../compose.js";
+import { createReplaySignal } from "../fx/replay-signal.js";
 import type { AnyAction, AnyState, Next } from "../types.js";
 import { StoreContext, StoreUpdateContext } from "./context.js";
 import { createRun } from "./run.js";
@@ -54,6 +60,7 @@ export function createStore<S extends AnyState>({
   enablePatches();
 
   const signal = createSignal<AnyAction, void>();
+  const watch = createReplaySignal<any, void>();
   scope.set(ActionContext, signal);
   scope.set(IdContext, id++);
 
@@ -92,7 +99,7 @@ export function createStore<S extends AnyState>({
   }
 
   function* logMdw(ctx: UpdaterCtx<S>, next: Next) {
-    dispatch({
+    yield* lift(dispatch)({
       type: `${API_ACTION_PREFIX}store`,
       payload: ctx,
     });
@@ -133,7 +140,7 @@ export function createStore<S extends AnyState>({
     yield* mdw(ctx);
 
     if (!ctx.result.ok) {
-      dispatch({
+      yield* lift(dispatch)({
         type: `${API_ACTION_PREFIX}store`,
         payload: ctx.result.error,
       });
@@ -166,13 +173,43 @@ export function createStore<S extends AnyState>({
     });
   }
 
+  function manage<Resource>(name: string, inputResource: Operation<Resource>) {
+    const CustomContext = createContext<Resource>(name);
+    function* manager() {
+      const providedResource = yield* inputResource;
+      scope.set(CustomContext, providedResource);
+      yield* suspend();
+    }
+    watch.send(manager);
+
+    // returns to the user so they can use this resource from
+    //  anywhere this context is available
+    return CustomContext;
+  }
+
+  const run = createRun(scope);
+
+  function initialize<T>(op: () => Operation<T>): Task<void> {
+    return scope.run(function* (): Operation<void> {
+      yield* scope.spawn(function* () {
+        for (const watched of yield* each(watch)) {
+          yield* scope.spawn(watched);
+          yield* each.next();
+        }
+      });
+      yield* op();
+    });
+  }
+
   const store: FxStore<S> = {
     getScope,
     getState,
     subscribe,
+    initialize,
+    manage,
     update,
     reset,
-    run: createRun(scope),
+    run,
     // instead of actions relating to store mutation, they
     // refer to pieces of business logic -- that can also mutate state
     dispatch,

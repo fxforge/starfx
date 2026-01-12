@@ -1,4 +1,4 @@
-import type { Operation, Scope } from "effection";
+import type { Context, Operation, Scope, Task } from "effection";
 import type { Patch } from "immer";
 import type { BaseCtx } from "../index.js";
 import type { AnyAction, AnyState } from "../types.js";
@@ -47,7 +47,12 @@ export interface FxStore<S extends AnyState> {
   subscribe: (fn: Listener) => () => void;
   update: (u: StoreUpdater<S> | StoreUpdater<S>[]) => Operation<UpdaterCtx<S>>;
   reset: (ignoreList?: (keyof S)[]) => Operation<UpdaterCtx<S>>;
+  manage: <Resource>(
+    name: string,
+    resource: Operation<Resource>,
+  ) => Context<Resource>;
   run: ReturnType<typeof createRun>;
+  initialize: <T>(op: () => Operation<T>) => Task<void>;
   dispatch: (a: AnyAction | AnyAction[]) => any;
   replaceReducer: (r: (s: S, a: AnyAction) => S) => void;
   getInitialState: () => S;

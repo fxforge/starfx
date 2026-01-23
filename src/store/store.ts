@@ -14,6 +14,7 @@ import { enablePatches, produceWithPatches } from "immer";
 import { API_ACTION_PREFIX, ActionContext, emit } from "../action.js";
 import { type BaseMiddleware, compose } from "../compose.js";
 import { createReplaySignal } from "../fx/replay-signal.js";
+import { supervise } from "../index.js";
 import type { AnyAction, AnyState, Next } from "../types.js";
 import { StoreContext, StoreUpdateContext } from "./context.js";
 import { createRun } from "./run.js";
@@ -180,7 +181,7 @@ export function createStore<S extends AnyState>({
       scope.set(CustomContext, providedResource);
       yield* suspend();
     }
-    watch.send(manager);
+    watch.send(supervise(manager));
 
     // returns to the user so they can use this resource from
     //  anywhere this context is available

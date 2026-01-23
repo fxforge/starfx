@@ -12,9 +12,12 @@ import {
 import {
   StoreContext,
   StoreUpdateContext,
+  createSchema,
   createStore,
+  slice,
   updateStore,
 } from "../store/index.js";
+import type { FxMap } from "../store/types.js";
 import { describe, expect, test } from "../test.js";
 
 interface User {
@@ -60,14 +63,22 @@ const updateUser =
     state.dev = true;
   };
 
+const testSchema = (initialState: Partial<State> = {}) => {
+  return createSchema<State, FxMap>({
+    users: slice.table<User>({ initialState: initialState.users ?? {} }),
+    theme: slice.str(initialState.theme ?? ""),
+    token: slice.str(initialState.token ?? ""),
+    dev: slice.any<boolean>(initialState.dev ?? false),
+  });
+};
+
 test("update store and receives update from channel `StoreUpdateContext`", async () => {
   expect.assertions(1);
   const [scope] = createScope();
-  const initialState: Partial<State> = {
+  const schema = testSchema({
     users: { 1: { id: "1", name: "testing" }, 2: { id: "2", name: "wow" } },
-    dev: false,
-  };
-  createStore({ scope, initialState });
+  });
+  const testStore = createStore({ scope, schemas: [schema] });
   let store;
   await scope.run(function* (): Operation<Result<void>[]> {
     const result = yield* parallel([
@@ -88,18 +99,17 @@ test("update store and receives update from channel `StoreUpdateContext`", async
   expect((store as any)?.getState()).toEqual({
     users: { 1: { id: "1", name: "eric" }, 3: { id: "", name: "" } },
     dev: true,
+    theme: "",
+    token: "",
   });
 });
 
 test("update store and receives update from `subscribe()`", async () => {
   expect.assertions(1);
-  const initialState: Partial<State> = {
+  const schema = testSchema({
     users: { 1: { id: "1", name: "testing" }, 2: { id: "2", name: "wow" } },
-    dev: false,
-    theme: "",
-    token: "",
-  };
-  const store = createStore({ initialState });
+  });
+  const store = createStore({ schemas: [schema] });
 
   store.subscribe(() => {
     expect(store.getState()).toEqual({
@@ -117,13 +127,10 @@ test("update store and receives update from `subscribe()`", async () => {
 
 test("emit Action and update store", async () => {
   expect.assertions(1);
-  const initialState: Partial<State> = {
+  const schema = testSchema({
     users: { 1: { id: "1", name: "testing" }, 2: { id: "2", name: "wow" } },
-    dev: false,
-    theme: "",
-    token: "",
-  };
-  const store = createStore({ initialState });
+  });
+  const store = createStore({ schemas: [schema] });
 
   await store.run(function* (): Operation<void> {
     const result = yield* parallel([
@@ -150,16 +157,13 @@ test("emit Action and update store", async () => {
 
 test("resets store", async () => {
   expect.assertions(2);
-  const initialState: Partial<State> = {
+  const schema = testSchema({
     users: { 1: { id: "1", name: "testing" }, 2: { id: "2", name: "wow" } },
-    dev: false,
-    theme: "",
-    token: "",
-  };
-  const store = createStore({ initialState });
+  });
+  const store = createStore({ schemas: [schema] });
 
   await store.run(function* () {
-    yield* store.update((s) => {
+    yield* schema.update((s: State) => {
       s.users = { 3: { id: "3", name: "hehe" } };
       s.dev = true;
       s.theme = "darkness";
@@ -173,7 +177,7 @@ test("resets store", async () => {
     dev: true,
   });
 
-  await store.run(() => store.reset(["users"]));
+  await store.run(() => schema.reset(["users"]));
 
   expect(store.getState()).toEqual({
     users: { 3: { id: "3", name: "hehe" } },
@@ -209,7 +213,7 @@ describe(".manage", () => {
 
     const thunk = createThunks();
     thunk.use(thunk.routes());
-    const store = createStore({ initialState: {} });
+    const store = createStore({ schemas: [createSchema()] });
     const TestContext = store.manage("test:context", guessAge());
     store.initialize(thunk.register);
     let acc = "bla";
@@ -228,7 +232,7 @@ describe(".manage", () => {
 
     const thunk = createThunks();
     thunk.use(thunk.routes());
-    const store = createStore({ initialState: {} });
+    const store = createStore({ schemas: [createSchema()] });
     const TestContext = store.manage("test:context", guessAge());
     store.initialize(thunk.register);
     let guess = 0;

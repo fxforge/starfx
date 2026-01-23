@@ -11,14 +11,13 @@ import {
   lift,
   suspend,
 } from "effection";
-import { enablePatches, produceWithPatches } from "immer";
 import { API_ACTION_PREFIX, ActionContext, emit } from "../action.js";
-import { type BaseMiddleware, compose } from "../compose.js";
+import type { BaseMiddleware } from "../compose.js";
 import { createReplaySignal } from "../fx/replay-signal.js";
 import type { AnyAction, AnyState, Next } from "../types.js";
 import { StoreContext, StoreUpdateContext } from "./context.js";
 import { createRun } from "./run.js";
-import type { FxStore, Listener, StoreUpdater, UpdaterCtx } from "./types.js";
+import type { FxSchema, FxStore, Listener, UpdaterCtx } from "./types.js";
 const stubMsg = "This is merely a stub, not implemented";
 
 let id = 0;
@@ -37,57 +36,19 @@ function observable() {
 
 export interface CreateStore<S extends AnyState> {
   scope?: Scope;
-  initialState: S;
-  middleware?: BaseMiddleware<UpdaterCtx<S>>[];
-  setStoreUpdater?: (
-    setState: (state: S) => void,
-    getState: () => S,
-    getScope: () => Scope,
-    getInitialState?: () => S,
-  ) => {
-    updateMdw: BaseMiddleware<UpdaterCtx<S>>;
-    initializeStore: Callable<any>;
-  };
+  schemas: FxSchema<S, any>[];
 }
 
 export const IdContext = createContext("starfx:id", 0);
 
-const defaultStoreUpdater = <S extends AnyState, T>(
-  setState: (state: S) => void,
-  getState: () => S,
-) => {
-  enablePatches();
+// Context to share store's tail middleware with schemas
+export const StoreTailMdwContext = createContext<
+  BaseMiddleware<UpdaterCtx<AnyState>>[]
+>("starfx:store-tail-mdw", [] as BaseMiddleware<UpdaterCtx<AnyState>>[]);
 
-  function* updateMdw(ctx: UpdaterCtx<S>, next: Next) {
-    const upds: StoreUpdater<S>[] = [];
-
-    if (Array.isArray(ctx.updater)) {
-      upds.push(...ctx.updater);
-    } else {
-      upds.push(ctx.updater);
-    }
-
-    const [nextState, patches, _] = produceWithPatches(getState(), (draft) => {
-      // TODO: check for return value inside updater
-      upds.forEach((updater) => updater(draft as any));
-    });
-    ctx.patches = patches;
-
-    // set the state!
-    setState(nextState);
-
-    yield* next();
-  }
-
-  const initializeStore = function* () {};
-  return { updateMdw, initializeStore };
-};
-
-export function createStore<S extends AnyState, T>({
-  initialState,
+export function createStore<S extends AnyState>({
   scope: initScope,
-  middleware = [],
-  setStoreUpdater = defaultStoreUpdater,
+  schemas,
 }: CreateStore<S>): FxStore<S> {
   let scope: Scope;
   if (initScope) {
@@ -97,6 +58,10 @@ export function createStore<S extends AnyState, T>({
     scope = tuple[0];
   }
 
+  // Build initial state from all schemas
+  const initialState = schemas.reduce((acc, schema) => {
+    return Object.assign(acc, schema.initialState);
+  }, {} as AnyState) as S;
   let state = initialState;
   const listeners = new Set<Listener>();
 
@@ -149,54 +114,16 @@ export function createStore<S extends AnyState, T>({
     yield* next();
   }
 
-  const { updateMdw, initializeStore } = setStoreUpdater(
-    setState,
-    getState,
-    getScope,
-    getInitialState,
-  );
-  const mdw = compose<UpdaterCtx<S>>([
-    updateMdw,
-    ...middleware,
+  // Set the store's tail middleware in context for schemas to use
+  const storeTailMdw: BaseMiddleware<UpdaterCtx<S>>[] = [
     logMdw,
     notifyChannelMdw,
     notifyListenersMdw,
-  ]);
-
-  function* update(updater: StoreUpdater<S> | StoreUpdater<S>[]) {
-    const ctx = {
-      updater,
-      patches: [],
-      result: Ok(undefined),
-    };
-
-    yield* mdw(ctx);
-
-    if (!ctx.result.ok) {
-      yield* lift(dispatch)({
-        type: `${API_ACTION_PREFIX}store`,
-        payload: ctx.result.error,
-      });
-    }
-
-    return ctx;
-  }
-
-  function* reset(ignoreList: (keyof S)[] = []) {
-    return yield* update((s) => {
-      const keep = ignoreList.reduce<S>(
-        (acc, key) => {
-          acc[key] = s[key];
-          return acc;
-        },
-        { ...initialState },
-      );
-
-      Object.keys(s).forEach((key: keyof S) => {
-        s[key] = keep[key];
-      });
-    });
-  }
+  ];
+  scope.set(
+    StoreTailMdwContext,
+    storeTailMdw as BaseMiddleware<UpdaterCtx<AnyState>>[],
+  );
 
   function manage<Resource>(name: string, inputResource: Operation<Resource>) {
     const CustomContext = createContext<Resource>(name);
@@ -216,7 +143,6 @@ export function createStore<S extends AnyState, T>({
 
   function initialize<T>(op: () => Operation<T>): Task<void> {
     return scope.run(function* (): Operation<void> {
-      yield* initializeStore();
       yield* scope.spawn(function* () {
         for (const watched of yield* each(watch)) {
           yield* scope.spawn(watched);
@@ -227,14 +153,27 @@ export function createStore<S extends AnyState, T>({
     });
   }
 
+  // Use the first schema as the default
+  const schema: FxSchema<S, any> = schemas[0] as FxSchema<S, any>;
+
+  // Build schemas map by name for selective access
+  const schemasMap = schemas.reduce(
+    (acc, s) => {
+      acc[s.name] = s as FxSchema<any, any>;
+      return acc;
+    },
+    {} as Record<string, FxSchema<any, any>>,
+  );
+
   const store: FxStore<S> = {
     getScope,
     getState,
+    setState,
     subscribe,
     initialize,
     manage,
-    update,
-    reset,
+    schema,
+    schemas: schemasMap,
     run,
     // instead of actions relating to store mutation, they
     // refer to pieces of business logic -- that can also mutate state

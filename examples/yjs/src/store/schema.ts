@@ -1,21 +1,58 @@
 import {
   type FxMap,
   type FxSchema,
-  type StoreUpdater,
-  updateStore,
+  type Next,
+  type UpdaterCtx,
+  type FxStore,
+  createSchemaWithUpdater,
 } from "starfx";
+import * as Y from "yjs";
 
-export function createSchema<
+/**
+ * Creates a Yjs-backed schema where state updates are synchronized via Y.Doc.
+ * This demonstrates using createSchemaWithUpdater for custom state management.
+ */
+export function createYjsSchema<
   O extends FxMap,
-  S extends { [key in keyof O]: ReturnType<O[key]>["initialState"] }
->(): [FxSchema<S, O>, S] {
-  const initialState = {} as S;
-  function* update(ups: StoreUpdater<S> | StoreUpdater<S>[]) {
-    return yield* updateStore(ups);
-  }
+  S extends { [key in keyof O]: ReturnType<O[key]>["initialState"] },
+>(slices: O): FxSchema<S, O> {
+  console.log("Creating Y.Doc");
+  const ydoc = new Y.Doc({ autoLoad: true });
+  const root = ydoc.getMap();
 
-  const db = {} as FxSchema<S, O>;
-  db.update = update;
+  const data = new Y.Map();
+  root.set("data", data);
+  data.set("items", new Y.Array());
 
-  return [db, initialState];
+  return createSchemaWithUpdater<O, S>(slices, {
+    createUpdateMdw: (store: FxStore<S>) => {
+      // Set up observer to sync Y.Doc changes to store
+      root.observeDeep(
+        (events: Y.YEvent<any>[], transaction: Y.Transaction) => {
+          console.log("Y.Doc changed", { events, transaction });
+          store.setState(root.toJSON() as S);
+        }
+      );
+
+      // Initialize store with current Y.Doc state
+      store.setState(root.toJSON() as S);
+
+      return function* updateMdw(ctx: UpdaterCtx<S>, next: Next) {
+        ydoc.transact(() => {
+          const updaters = Array.isArray(ctx.updater)
+            ? ctx.updater
+            : [ctx.updater];
+          for (const updater of updaters) {
+            updater(root as any);
+          }
+        });
+        console.log({ updater: ctx.updater });
+        store.setState(root.toJSON() as S);
+        yield* next();
+      };
+    },
+  });
 }
+
+// For backwards compatibility, also export as createSchema
+export { createYjsSchema as createSchema };

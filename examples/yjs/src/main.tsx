@@ -2,8 +2,7 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import { Provider } from "starfx/react";
 import { createStore, take } from "starfx";
-import { defaultStoreUpdater } from "./store/updater.js";
-import { thunks, initialState, schema } from "./thunks.js";
+import { thunks, schema } from "./thunks.js";
 import App from "./App.js";
 import "./index.css";
 
@@ -11,8 +10,7 @@ init();
 
 function init() {
   const store = createStore({
-    initialState,
-    setStoreUpdater: defaultStoreUpdater,
+    schemas: [schema],
   });
   // makes `fx` available in devtools
   (window as any).fx = store;
@@ -29,7 +27,7 @@ function init() {
 
   ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
     <React.StrictMode>
-      <Provider schema={schema} store={store}>
+      <Provider store={store}>
         <App id="1" />
       </Provider>
     </React.StrictMode>

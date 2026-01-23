@@ -12,6 +12,9 @@ import {
   type FxStore,
   PERSIST_LOADER_ID,
 } from "./store/index.js";
+import type { LoaderOutput } from "./store/slice/loaders.js";
+import type { TableOutput } from "./store/slice/table.js";
+import type { FxMap } from "./store/types.js";
 import type { AnyState, LoaderState } from "./types.js";
 import type { ActionFn, ActionFnWithPayload } from "./types.js";
 
@@ -49,25 +52,70 @@ export interface UseCacheResult<D = any, A extends ThunkAction = ThunkAction>
   data: D | null;
 }
 
-const SchemaContext = createContext<FxSchema<any, any> | null>(null);
+const SchemaContext = createContext<FxSchema<AnyState, FxMap> | null>(null);
 
-export function Provider({
-  store,
-  schema,
-  children,
-}: {
+// Strongly-typed overload that ties `store` and `schema` to the same state type S
+export function Provider<S extends AnyState>(props: {
+  store: FxStore<S>;
+  schema?: FxSchema<S, any>;
+  children?: React.ReactNode;
+}): React.ReactElement;
+
+// Provider overload accepting any store and schema to avoid variance issues
+export function Provider(props: {
   store: FxStore<any>;
-  schema: FxSchema<any, any>;
-  children: React.ReactNode;
+  schema?: FxSchema<any, any>;
+  children?: React.ReactNode;
+}): React.ReactElement;
+
+// Runtime implementation uses `AnyState` for minimal widening
+export function Provider(props: {
+  store: FxStore<AnyState>;
+  schema?: FxSchema<AnyState, any>;
+  children?: React.ReactNode;
 }) {
-  return h(ReduxProvider, {
-    store,
-    children: h(SchemaContext.Provider, { value: schema, children }) as any,
-  });
+  const { store, schema, children } = props;
+  // Use provided schema or pull from store
+  const schemaValue = (schema ?? store.schema) as FxSchema<AnyState, any>;
+  const inner = h(SchemaContext.Provider, { value: schemaValue }, children);
+  return h(ReduxProvider, { store, children: inner });
 }
 
 export function useSchema<S extends AnyState>() {
-  return useContext(SchemaContext) as FxSchema<S>;
+  const ctx = useContext(SchemaContext);
+  if (!ctx) throw new Error("No Schema available in context");
+  return ctx as FxSchema<S>;
+}
+
+// Typed variant for schemas that include `loaders`.
+export function useSchemaWithLoaders(): FxSchema<
+  AnyState,
+  { loaders: (n: string) => LoaderOutput<any, any> }
+>;
+export function useSchemaWithLoaders<
+  S extends { loaders: LoaderOutput<any, any>["initialState"] },
+>(): FxSchema<S, { loaders: (n: string) => LoaderOutput<any, any> }>;
+export function useSchemaWithLoaders() {
+  const ctx = useContext(SchemaContext);
+  if (!ctx) throw new Error("No Schema available in context");
+  return ctx as FxSchema<
+    any,
+    { loaders: (n: string) => LoaderOutput<any, any> }
+  >;
+}
+
+// Typed variant for schemas that include `cache`.
+export function useSchemaWithCache(): FxSchema<
+  AnyState,
+  { cache: (n: string) => TableOutput<any, any> }
+>;
+export function useSchemaWithCache<
+  S extends { cache: TableOutput<any, any>["initialState"] },
+>(): FxSchema<S, { cache: (n: string) => TableOutput<any, any> }>;
+export function useSchemaWithCache() {
+  const ctx = useContext(SchemaContext);
+  if (!ctx) throw new Error("No Schema available in context");
+  return ctx as FxSchema<any, { cache: (n: string) => TableOutput<any, any> }>;
 }
 
 export function useStore<S extends AnyState>() {
@@ -97,12 +145,17 @@ export function useStore<S extends AnyState>() {
  * }
  * ```
  */
-export function useLoader<S extends AnyState>(
+export function useLoader(
   action: ThunkAction | ActionFnWithPayload,
-) {
-  const schema = useSchema();
+): LoaderState<any>;
+export function useLoader<
+  S extends { loaders: LoaderOutput<any, any>["initialState"] },
+  M extends AnyState = any,
+>(action: ThunkAction | ActionFnWithPayload): LoaderState<M>;
+export function useLoader(action: any) {
+  const schema = useSchemaWithLoaders();
   const id = getIdFromAction(action);
-  return useSelector((s: S) => schema.loaders.selectById(s, { id }));
+  return useSelector((s: any) => schema.loaders.selectById(s, { id }));
 }
 
 /**
@@ -201,14 +254,20 @@ export function useQuery<P = any, A extends ThunkAction = ThunkAction<P>>(
  * }
  * ```
  */
-export function useCache<P = any, ApiSuccess = any>(
+export function useCache(action: ThunkAction): UseCacheResult<any, ThunkAction>;
+export function useCache<
+  S extends { cache: TableOutput<any, any>["initialState"] },
+  P = any,
+  ApiSuccess = any,
+>(
   action: ThunkAction<P, ApiSuccess>,
-): UseCacheResult<typeof action.payload._result, ThunkAction<P, ApiSuccess>> {
-  const schema = useSchema();
+): UseCacheResult<typeof action.payload._result, ThunkAction<P, ApiSuccess>>;
+export function useCache(action: any) {
+  const schema = useSchemaWithCache();
   const id = action.payload.key;
-  const data: any = useSelector((s: any) => schema.cache.selectById(s, { id }));
+  const data = useSelector((s: any) => schema.cache.selectById(s, { id }));
   const query = useQuery(action);
-  return { ...query, data: data || null };
+  return { ...query, data: (data as any) || null };
 }
 
 /**
@@ -266,7 +325,7 @@ export function PersistGate({
   children,
   loading = h(Loading),
 }: PersistGateProps) {
-  const schema = useSchema();
+  const schema = useSchemaWithLoaders();
   const ldr = useSelector((s: any) =>
     schema.loaders.selectById(s, { id: PERSIST_LOADER_ID }),
   );

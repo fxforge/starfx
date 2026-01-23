@@ -1,8 +1,8 @@
-import { createThunks, mdw, StoreContext } from "starfx";
+import { createThunks, mdw } from "starfx";
 import { createSchema } from "./store/schema.js";
 
-export const [schema, initialState] = createSchema();
-export type AppState = typeof initialState;
+export const schema = createSchema({});
+export type AppState = typeof schema.initialState;
 
 export const thunks = createThunks();
 // catch errors from task and logs them with extra info

@@ -1,4 +1,5 @@
 import { Err, Ok, type Operation, type Result } from "effection";
+import type { Draft } from "immer";
 import type { AnyState, Next } from "../types.js";
 import { select, updateStore } from "./fx.js";
 import type { UpdaterCtx } from "./types.js";
@@ -98,10 +99,13 @@ export function createPersistor<S extends AnyState>({
 
     const state = yield* select((s) => s);
     const nextState = reconciler(state as S, stateFromStorage);
-    yield* updateStore<S>((state) => {
-      Object.keys(nextState).forEach((key: keyof S) => {
-        state[key] = nextState[key];
-      });
+    yield* updateStore<S>((st) => {
+      const draft = st as Draft<S>;
+      const stateObj = draft as unknown as { [K in keyof S]: S[K] };
+
+      for (const key of Object.keys(nextState) as Array<keyof S>) {
+        stateObj[key] = nextState[key];
+      }
     });
 
     return Ok(undefined);

@@ -7,13 +7,16 @@ import { StoreContext } from "./context.js";
 import type { LoaderOutput } from "./slice/loaders.js";
 import type { FxStore, StoreUpdater, UpdaterCtx } from "./types.js";
 
+/**
+ * Updates the store using the default schema's update method.
+ * For multiple schemas, use `store.schemas[name].update()` directly.
+ */
 export function* updateStore<S extends AnyState>(
   updater: StoreUpdater<S> | StoreUpdater<S>[],
 ): Operation<UpdaterCtx<S>> {
   const store = yield* StoreContext.expect();
-  // had to cast the store since StoreContext has a generic store type
   const st = store as FxStore<S>;
-  const ctx = yield* st.update(updater);
+  const ctx = yield* st.schema.update(updater);
   return ctx;
 }
 

@@ -10,15 +10,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
       - name: get version
         id: vars
         run: echo ::set-output name=version::$(echo ${{github.ref_name}} | sed 's/^v//')
       - name: setup node
-        uses: actions/setup-node@v2
+        uses: actions/setup-node@v6
         with:
-          node-version: 20.x
-          registry-url: https://registry.npmjs.com
+          node-version: 24.x
       - name: install
         run: npm install
       - name: build

@@ -5,6 +5,17 @@ interface OpMap<T = unknown, TArgs extends unknown[] = []> {
   [key: string]: (...args: TArgs) => Operation<T>;
 }
 
+/**
+ * Race multiple operations and return the result map of the first-completed task.
+ *
+ * @remarks
+ * Each operation in `opMap` is started concurrently. When one operation
+ * completes, the others are halted and the function resolves with an object
+ * mapping keys to their respective completed values.
+ *
+ * @param opMap - Map of named operation factories.
+ * @returns An operation that resolves to the result map of the winner task.
+ */
 export function raceMap<T>(opMap: OpMap): Operation<{
   [K in keyof OpMap<T>]: OpMap[K] extends (...args: any[]) => any
     ? ReturnType<OpMap[K]>

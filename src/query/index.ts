@@ -9,4 +9,7 @@ export { createThunks, type ThunksApi };
 /**
  * @deprecated Use {@link createThunks} instead;
  */
+/**
+ * Alias for {@link createThunks} to support a pipe-oriented naming convention.
+ */
 export const createPipe = createThunks;

@@ -17,6 +17,13 @@ interface PropIds {
 
 const excludesFalse = <T>(n?: T): n is T => Boolean(n);
 
+/**
+ * Create a default loader item structure with sensible defaults.
+ *
+ * @typeParam M - Metadata shape stored on the loader.
+ * @param li - Partial fields to override the defaults.
+ * @returns A fully populated {@link LoaderItemState}.
+ */
 export function defaultLoaderItem<M extends AnyState = AnyState>(
   li: Partial<LoaderItemState<M>> = {},
 ): LoaderItemState<M> {
@@ -31,6 +38,13 @@ export function defaultLoaderItem<M extends AnyState = AnyState>(
   };
 }
 
+/**
+ * Convert a {@link LoaderItemState} into a {@link LoaderState} with helper booleans.
+ *
+ * @typeParam M - Metadata shape stored on the loader.
+ * @param l - Partial loader fields to normalize.
+ * @returns A {@link LoaderState} with `isLoading`/`isSuccess` helpers set.
+ */
 export function defaultLoader<M extends AnyState = AnyState>(
   l: Partial<LoaderItemState<M>> = {},
 ): LoaderState<M> {
@@ -109,7 +123,9 @@ function loaderSelectors<
 export interface LoaderOutput<
   M extends Record<string, unknown>,
   S extends AnyState,
-> extends LoaderSelectors<M, S>,
+>
+  extends
+    LoaderSelectors<M, S>,
     BaseSchema<Record<string, LoaderItemState<M>>> {
   schema: "loader";
   initialState: Record<string, LoaderItemState<M>>;
@@ -122,6 +138,15 @@ export interface LoaderOutput<
 
 const ts = () => new Date().getTime();
 
+/**
+ * Create a loader slice for tracking async loader state keyed by id.
+ *
+ * @typeParam M - Metadata shape stored on loader entries.
+ * @typeParam S - Root state shape.
+ * @param param0.name - The slice name to attach to the state.
+ * @param param0.initialState - Optional initial loader table.
+ * @returns A `LoaderOutput` exposing selectors and mutation helpers.
+ */
 export const createLoaders = <
   M extends AnyState = AnyState,
   S extends AnyState = AnyState,
@@ -180,6 +205,11 @@ export const createLoaders = <
   };
 };
 
+/**
+ * Shortcut for declaring loader slices in schema definitions.
+ *
+ * @param initialState - Optional initial loader table.
+ */
 export function loaders<M extends AnyState = AnyState>(
   initialState?: Record<string, LoaderItemState<M>>,
 ) {

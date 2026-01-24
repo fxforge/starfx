@@ -3,6 +3,13 @@ import { API_ACTION_PREFIX, put } from "../action.js";
 import { parallel } from "./parallel.js";
 import { safe } from "./safe.js";
 
+/**
+ * Default exponential backoff used by {@link supervise}.
+ *
+ * @param attempt - Current attempt count (1-based).
+ * @param max - Maximum attempts before giving up (default: 10).
+ * @returns Milliseconds to wait before next attempt, or a negative value to stop.
+ */
 export function superviseBackoff(attempt: number, max = 10): number {
   if (attempt > max) return -1;
   // 20ms, 40ms, 80ms, 160ms, 320ms, 640ms, 1280ms, 2560ms, 5120ms, 10240ms
@@ -10,11 +17,13 @@ export function superviseBackoff(attempt: number, max = 10): number {
 }
 
 /**
- * supvervise will watch whatever {@link Operation} is provided
- * and it will automatically try to restart it when it exists.  By
- * default it uses a backoff pressure mechanism so if there is an
- * error simply calling the {@link Operation} then it will exponentially
- * wait longer until attempting to restart and eventually give up.
+ * Create a supervised operation that will restart the provided operation when
+ * it fails. The supervisor will apply a backoff strategy between attempts and
+ * emit an action on failure.
+ *
+ * @param op - Operation factory to supervise.
+ * @param backoff - Backoff function returning milliseconds to wait or <0 to stop.
+ * @returns An operation factory that supervises `op`.
  */
 export function supervise<T, TArgs extends unknown[] = []>(
   op: (...args: TArgs) => Operation<T>,
@@ -45,8 +54,12 @@ export function supervise<T, TArgs extends unknown[] = []>(
 }
 
 /**
- * keepAlive accepts a list of operations and calls them all with
- * {@link supervise}
+ * Supervise (keep alive) a list of operations concurrently. Each operation
+ * will be wrapped with {@link supervise} and executed in parallel.
+ *
+ * @param ops - Array of operation factories to supervise.
+ * @param backoff - Optional custom backoff function.
+ * @returns An array of supervision results wrapped in `Result`.
  */
 export function* keepAlive<T, TArgs extends unknown[] = []>(
   ops: ((...args: TArgs) => Operation<T>)[],

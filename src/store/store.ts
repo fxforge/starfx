@@ -36,6 +36,19 @@ export interface CreateStore<S extends AnyState> {
 
 export const IdContext = createContext("starfx:id", 0);
 
+/**
+ * Creates a new FxStore instance.
+ *
+ * @remarks
+ * The store wraps an Effection scope and provides state management primitives,
+ * listener registration, middleware application, and a `run` helper for
+ * executing operations within the store's scope.
+ *
+ * @param options.initialState - The initial state for the store.
+ * @param options.scope - Optional Effection scope to use. If omitted, a new scope is created.
+ * @param options.middleware - Optional array of store middleware.
+ * @returns A fully configured `FxStore` instance.
+ */
 export function createStore<S extends AnyState>({
   initialState,
   scope: initScope,

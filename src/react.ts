@@ -34,8 +34,9 @@ export interface UseApiSimpleProps extends LoaderState {
   trigger: () => void;
   action: ActionFnWithPayload;
 }
-export interface UseApiAction<A extends ThunkAction = ThunkAction>
-  extends LoaderState {
+export interface UseApiAction<
+  A extends ThunkAction = ThunkAction,
+> extends LoaderState {
   trigger: () => void;
   action: A;
 }
@@ -44,13 +45,26 @@ export type UseApiResult<P, A extends ThunkAction = ThunkAction> =
   | UseApiSimpleProps
   | UseApiAction<A>;
 
-export interface UseCacheResult<D = any, A extends ThunkAction = ThunkAction>
-  extends UseApiAction<A> {
+export interface UseCacheResult<
+  D = any,
+  A extends ThunkAction = ThunkAction,
+> extends UseApiAction<A> {
   data: D | null;
 }
 
 const SchemaContext = createContext<FxSchema<any, any> | null>(null);
 
+/**
+ * React Provider to wire the `FxStore` and schema into React context.
+ *
+ * @remarks
+ * Wrap your application with this provider to make `useSchema`, `useStore`,
+ * and the `react` hooks available to descendants.
+ *
+ * @param props.store - The `FxStore` instance created by `createStore`.
+ * @param props.schema - The `FxSchema` created by `createSchema`.
+ * @param props.children - React children.
+ */
 export function Provider({
   store,
   schema,
@@ -262,6 +276,34 @@ function Loading({ text }: { text: string }) {
   return h("div", null, text);
 }
 
+/**
+ * PersistGate delays rendering of `children` until the persistence layer has
+ * completed rehydration.
+ *
+ * @remarks
+ * - It selects the loader identified by `PERSIST_LOADER_ID` from the current
+ *   schema's `loaders` slice.
+ * - While the loader status is not `success`, the `loading` element is
+ *   rendered (defaults to a simple `Loading` element).
+ * - If the loader reaches `error`, the error message is displayed instead of
+ *   children or the loading element.
+ *
+ * @param props.children - Elements to render once persistence has successfully rehydrated.
+ * @param props.loading - Optional element to render while rehydrating.
+ *
+ * @example
+ * ```tsx
+ * import { PersistGate } from 'starfx/react';
+ *
+ * function App() {
+ *   return (
+ *     <PersistGate loading={<div>Restoring state...</div>}>
+ *       <RootApp />
+ *     </PersistGate>
+ *   );
+ * }
+ * ```
+ */
 export function PersistGate({
   children,
   loading = h(Loading),

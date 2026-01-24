@@ -15,11 +15,26 @@ import { createFilterQueue } from "./queue.js";
 import type { Action, ActionWithPayload, AnyAction } from "./types.js";
 import type { ActionFnWithPayload } from "./types.js";
 
+/**
+ * Shared action signal used by `put`, `useActions`, and related helpers.
+ *
+ * This context stores an Effection Signal that flows actions through the
+ * runtime and is used by the action helpers to subscribe and emit actions.
+ */
 export const ActionContext = createContext(
   "starfx:action",
   createSignal<AnyAction, void>(),
 );
 
+/**
+ * Subscribe to action events that match `pattern`.
+ *
+ * @remarks
+ * Returns an Effection `Stream` that yields actions matching the provided pattern.
+ * The stream will replay previously queued items for new subscribers.
+ *
+ * @param pattern - Pattern or action type to match against emitted actions.
+ */
 export function useActions(pattern: ActionPattern): Stream<AnyAction, void> {
   return {
     [Symbol.iterator]: function* () {
@@ -31,6 +46,12 @@ export function useActions(pattern: ActionPattern): Stream<AnyAction, void> {
   };
 }
 
+/**
+ * Emit one or more actions into the provided signal.
+ *
+ * @param param0.signal - The Effection Signal to send actions through.
+ * @param param0.action - An action or an array of actions.
+ */
 export function emit({
   signal,
   action,
@@ -48,6 +69,11 @@ export function emit({
   }
 }
 
+/**
+ * Put an action into the global action signal (convenience wrapper around {@link emit}).
+ *
+ * @param action - Action or actions to dispatch.
+ */
 export function* put(action: AnyAction | AnyAction[]) {
   const signal = yield* ActionContext.expect();
   return yield* lift(emit)({
@@ -56,6 +82,12 @@ export function* put(action: AnyAction | AnyAction[]) {
   });
 }
 
+/**
+ * Take the next matching action from the action stream.
+ *
+ * @param pattern - Pattern to match actions against.
+ * @returns The matching action or a sentinel if the stream closed.
+ */
 export function take<P>(
   pattern: ActionPattern,
 ): Operation<ActionWithPayload<P>>;
@@ -71,6 +103,9 @@ export function* take(pattern: ActionPattern): Operation<Action> {
   return result.value;
 }
 
+/**
+ * Spawn a handler for each matching action concurrently.
+ */
 export function* takeEvery<T>(
   pattern: ActionPattern,
   op: (action: AnyAction) => Operation<T>,
@@ -82,6 +117,10 @@ export function* takeEvery<T>(
   }
 }
 
+/**
+ * Spawn a handler for each matching action but cancel the previous one if a new
+ * action arrives.
+ */
 export function* takeLatest<T>(
   pattern: ActionPattern,
   op: (action: AnyAction) => Operation<T>,
@@ -98,6 +137,10 @@ export function* takeLatest<T>(
   }
 }
 
+/**
+ * Sequentially handle matching actions ensuring the handler finishes before
+ * processing the next one.
+ */
 export function* takeLeading<T>(
   pattern: ActionPattern,
   op: (action: AnyAction) => Operation<T>,
@@ -108,6 +151,11 @@ export function* takeLeading<T>(
   }
 }
 
+/**
+ * Wait until the provided predicate operation returns `true`.
+ *
+ * @param predicate - Operation returning a boolean.
+ */
 export function* waitFor(predicate: () => Operation<boolean>): Operation<void> {
   const init = yield* predicate();
   if (init) {
@@ -123,6 +171,9 @@ export function* waitFor(predicate: () => Operation<boolean>): Operation<void> {
   }
 }
 
+/**
+ * Extract the deterministic id from an action or action-creator.
+ */
 export function getIdFromAction(
   action: ActionWithPayload<{ key: string }> | ActionFnWithPayload,
 ): string {
@@ -131,6 +182,11 @@ export function getIdFromAction(
 
 export const API_ACTION_PREFIX = "";
 
+/**
+ * Create an action creator function with optional payload.
+ *
+ * @param actionType - The action type string.
+ */
 export function createAction(actionType: string): () => Action;
 export function createAction<P>(
   actionType: string,

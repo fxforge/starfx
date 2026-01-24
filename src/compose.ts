@@ -1,15 +1,27 @@
 import type { Operation } from "effection";
 import type { Next } from "./types.js";
 
+/**
+ * Base context for middleware. Implementations may extend this with typed fields.
+ */
 export interface BaseCtx {
   [key: string]: any;
 }
 
+/**
+ * Middleware function shape used across the library.
+ */
 export type BaseMiddleware<Ctx extends BaseCtx = BaseCtx, T = unknown> = (
   ctx: Ctx,
   next: Next,
 ) => Operation<T | undefined>;
 
+/**
+ * Compose an array of middleware into a single middleware function.
+ *
+ * @param middleware - Array of middleware to compose.
+ * @returns A composed middleware function that runs the stack in order.
+ */
 export function compose<Ctx extends BaseCtx = BaseCtx, T = unknown>(
   middleware: BaseMiddleware<Ctx, T>[],
 ) {

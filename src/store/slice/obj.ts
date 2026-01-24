@@ -1,8 +1,10 @@
 import type { AnyState } from "../../types.js";
 import type { BaseSchema } from "../types.js";
 
-export interface ObjOutput<V extends AnyState, S extends AnyState>
-  extends BaseSchema<V> {
+export interface ObjOutput<
+  V extends AnyState,
+  S extends AnyState,
+> extends BaseSchema<V> {
   schema: "obj";
   initialState: V;
   set: (v: V) => (s: S) => void;
@@ -11,6 +13,13 @@ export interface ObjOutput<V extends AnyState, S extends AnyState>
   select: (s: S) => V;
 }
 
+/**
+ * Create an object slice with update, set, and reset helpers.
+ *
+ * @param name - The state key for this slice.
+ * @param initialState - The initial object used for this slice.
+ * @returns An `ObjOutput` providing setters, partial updates, and a selector.
+ */
 export function createObj<V extends AnyState, S extends AnyState = AnyState>({
   name,
   initialState,
@@ -39,6 +48,11 @@ export function createObj<V extends AnyState, S extends AnyState = AnyState>({
   };
 }
 
+/**
+ * Shortcut to create an `obj` slice for schema creation.
+ *
+ * @param initialState - The initial object used for the slice.
+ */
 export function obj<V extends AnyState>(initialState: V) {
   return (name: string) => createObj<V, AnyState>({ name, initialState });
 }

@@ -3,6 +3,9 @@ import type { AnyState, Next } from "../types.js";
 import { select, updateStore } from "./fx.js";
 import type { UpdaterCtx } from "./types.js";
 
+/**
+ * Loader id used internally by the persistence system to track rehydration status.
+ */
 export const PERSIST_LOADER_ID = "@@starfx/persist";
 
 export interface PersistAdapter<S extends AnyState> {
@@ -24,6 +27,12 @@ interface TransformFunctions<S extends AnyState> {
   out(s: Partial<S>): Partial<S>;
 }
 
+/**
+ * Create a transform object for persistence that can alter the shape of the
+ * state when saving or loading.
+ *
+ * @returns An object with `.in` and `.out` transformer functions.
+ */
 export function createTransform<S extends AnyState>() {
   const transformers: TransformFunctions<S> = {
     in: (currentState: Partial<S>): Partial<S> => currentState,
@@ -73,6 +82,21 @@ export function shallowReconciler<S extends AnyState>(
   return { ...original, ...persisted };
 }
 
+/**
+ * Create a persistor that knows how to rehydrate state from an adapter.
+ *
+ * @remarks
+ * The persistor provides a `rehydrate` operation that reads persisted state,
+ * applies an optional `transform.out`, and merges the result into the current
+ * store state using the provided reconciler.
+ *
+ * @param options.adapter - PersistAdapter used to read/write storage.
+ * @param options.key - Storage key for persisted data (default: "starfx").
+ * @param options.reconciler - Function to merge original and rehydrated state.
+ * @param options.allowlist - List of keys to persist (empty = persist entire state).
+ * @param options.transform - Optional transformers for inbound/outbound shapes.
+ * @returns Persistor properties including `rehydrate`.
+ */
 export function createPersistor<S extends AnyState>({
   adapter,
   key = "starfx",
@@ -117,6 +141,13 @@ export function createPersistor<S extends AnyState>({
   };
 }
 
+/**
+ * Middleware that persists the store state after each update.
+ *
+ * @remarks
+ * Applies an optional inbound transform and either persists the entire state
+ * (when `allowlist` is empty) or only the listed keys.
+ */
 export function persistStoreMdw<S extends AnyState>({
   allowlist,
   adapter,

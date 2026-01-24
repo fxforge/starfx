@@ -28,11 +28,30 @@ import type {
   ThunkCtx,
 } from "./types.js";
 
+/**
+ * API for creating and managing thunk-style actions.
+ *
+ * @remarks
+ * Use `createThunks` (or `createApi`) to obtain an instance of this API which
+ * allows registering middleware, creating typed action creators, managing
+ * resources, and registering the runtime watchers that listen for dispatched actions.
+ */
 export interface ThunksApi<Ctx extends ThunkCtx> {
+  /** Register a middleware function into the pipeline. */
   use: (fn: Middleware<Ctx>) => void;
+  /** Returns a middleware function that routes to action-specific middleware. */
   routes: () => Middleware<Ctx>;
+  /** Register the thunks with the current store scope. */
   register: () => Operation<void>;
+  /** Reset any dynamically bound middleware for created actions. */
   reset: () => void;
+  /**
+   * Start and expose an Effection resource within the store scope.
+   *
+   * @param name - unique name for the resource Context
+   * @param resource - an Effection Operation (usually created with `resource(...)`)
+   * @returns a `Context<Resource>` that can `get()` or `expect()`
+   */
   manage: <Resource>(
     name: string,
     resource: Operation<Resource>,

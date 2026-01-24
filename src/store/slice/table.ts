@@ -100,6 +100,19 @@ export interface TableOutput<
   selectByIds: (s: S, p: PropIds) => Entity[];
 }
 
+/**
+ * Create a table-style slice (id -> entity map) with selectors and update helpers.
+ *
+ * @remarks
+ * The table slice exposes selectors (findById, selectTableAsList, etc.), CRUD-style
+ * operations (`add`, `set`, `remove`, `patch`, `merge`) and an `empty` entity
+ * fallback when requested.
+ *
+ * @param p.name - The state key for this table.
+ * @param p.initialState - Optional initial map of entities.
+ * @param p.empty - Optional empty entity or factory used as a default for `selectById`.
+ * @returns A `TableOutput` with selectors and mutation helpers.
+ */
 export function createTable<
   Entity extends AnyState = AnyState,
   S extends AnyState = AnyState,
@@ -141,6 +154,7 @@ export function createTable<
         state[id] = entities[id];
       });
     },
+
     set: (entities) => (s) => {
       (s as any)[name] = entities;
     },
@@ -192,6 +206,13 @@ export function table<
   initialState?: Record<IdProp, Entity>;
   empty?: Entity | (() => Entity);
 }): (n: string) => TableOutput<Entity, S, Entity | undefined>;
+/**
+ * Shortcut for defining a `table` slice when building schema declarations.
+ *
+ * @param initialState - Optional initial entity map.
+ * @param empty - Optional empty entity or factory.
+ * @returns A factory function accepting the slice name.
+ */
 export function table<
   Entity extends AnyState = AnyState,
   S extends AnyState = AnyState,

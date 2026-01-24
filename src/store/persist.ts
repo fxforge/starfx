@@ -83,19 +83,46 @@ export function shallowReconciler<S extends AnyState>(
 }
 
 /**
- * Create a persistor that knows how to rehydrate state from an adapter.
+ * Create a persistor for state rehydration from storage.
  *
  * @remarks
- * The persistor provides a `rehydrate` operation that reads persisted state,
- * applies an optional `transform.out`, and merges the result into the current
- * store state using the provided reconciler.
+ * The persistor provides a `rehydrate` operation that:
+ * 1. Reads persisted state from the adapter
+ * 2. Applies optional `transform.out` to the loaded data
+ * 3. Merges with current state using the reconciler
+ * 4. Updates the store with the merged state
  *
- * @param options.adapter - PersistAdapter used to read/write storage.
- * @param options.key - Storage key for persisted data (default: "starfx").
+ * The persistence system uses a special loader (`PERSIST_LOADER_ID`) to
+ * track rehydration status, which {@link PersistGate} uses to delay
+ * rendering until rehydration completes.
+ *
+ * @typeParam S - The state shape.
+ * @param options - Persistor configuration.
+ * @param options.adapter - Storage adapter (e.g., localStorage, AsyncStorage).
+ * @param options.key - Storage key for persisted data (default: 'starfx').
  * @param options.reconciler - Function to merge original and rehydrated state.
- * @param options.allowlist - List of keys to persist (empty = persist entire state).
+ * @param options.allowlist - Keys to persist (empty = persist entire state).
  * @param options.transform - Optional transformers for inbound/outbound shapes.
- * @returns Persistor properties including `rehydrate`.
+ * @returns Persistor properties including the `rehydrate` operation.
+ *
+ * @see {@link createLocalStorageAdapter} for browser storage.
+ * @see {@link PersistGate} for React integration.
+ * @see {@link shallowReconciler} for the default merge strategy.
+ *
+ * @example Basic setup
+ * ```ts
+ * import { createPersistor, createLocalStorageAdapter } from 'starfx';
+ *
+ * const persistor = createPersistor({
+ *   adapter: createLocalStorageAdapter(),
+ *   key: 'my-app',
+ *   allowlist: ['users', 'settings'],
+ *   reconciler: shallowReconciler,
+ * });
+ *
+ * // In your app initialization
+ * store.run(persistor.rehydrate);
+ * ```
  */
 export function createPersistor<S extends AnyState>({
   adapter,

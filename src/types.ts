@@ -1,7 +1,21 @@
 import type { Operation } from "effection";
 
 /**
- * Function used by middleware chains to advance to the next operation.
+ * Function passed to middleware to advance to the next operation in the stack.
+ *
+ * @remarks
+ * Call `yield* next()` to pass control to the next middleware. Code after
+ * the yield point executes after all downstream middleware have completed.
+ * Not calling `next()` exits the middleware stack early.
+ *
+ * @example
+ * ```ts
+ * function* myMiddleware(ctx, next) {
+ *   console.log('before');
+ *   yield* next();  // Call next middleware
+ *   console.log('after');
+ * }
+ * ```
  */
 export type Next = () => Operation<void>;
 
@@ -16,7 +30,13 @@ export type IdProp = string | number;
 export type LoadingStatus = "loading" | "success" | "error" | "idle";
 
 /**
- * Minimal state tracked for each loader instance.
+ * Minimal state tracked for each loader instance (internal representation).
+ *
+ * @remarks
+ * This is the raw state stored in the loaders slice. For consumer-facing
+ * state with convenience booleans, see {@link LoaderState}.
+ *
+ * @typeParam M - Shape of the `meta` object for custom metadata.
  */
 export interface LoaderItemState<
   M extends Record<string, unknown> = Record<IdProp, unknown>,
@@ -36,11 +56,25 @@ export interface LoaderItemState<
 }
 
 /**
- * Extended loader state used by consumer hooks (convenience booleans).
+ * Extended loader state with convenience boolean properties.
+ *
+ * @remarks
+ * This is the type returned by loader selectors and hooks. It extends
+ * {@link LoaderItemState} with computed booleans for easy status checking:
+ *
+ * - `isIdle` - Initial state, operation hasn't started
+ * - `isLoading` - Currently executing
+ * - `isSuccess` - Completed successfully
+ * - `isError` - Failed with an error
+ * - `isInitialLoading` - Loading AND has never succeeded before
+ *
+ * The `isInitialLoading` property is useful for showing loading UI only
+ * on the first fetch, while displaying stale data during refreshes.
+ *
+ * @typeParam M - Shape of the `meta` object for custom metadata.
  */
-export interface LoaderState<
-  M extends AnyState = AnyState,
-> extends LoaderItemState<M> {
+export interface LoaderState<M extends AnyState = AnyState>
+  extends LoaderItemState<M> {
   isIdle: boolean;
   isLoading: boolean;
   isError: boolean;
@@ -58,7 +92,14 @@ export interface Payload<P = any> {
 }
 
 /**
- * Basic action shape used by the library.
+ * Basic action shape used throughout the library.
+ *
+ * @remarks
+ * Actions are plain objects with a `type` string that identifies the action.
+ * This follows the Flux Standard Action pattern.
+ *
+ * @see {@link AnyAction} for actions with optional payload/meta.
+ * @see {@link ActionWithPayload} for actions with typed payload.
  */
 export interface Action {
   /** Action type string */
@@ -78,7 +119,18 @@ export type ActionFnWithPayload<P = any> = (p: P) => { toString: () => string };
 
 // https://github.com/redux-utilities/flux-standard-action
 /**
- * Extended action which may carry payload/meta/error in FSA style.
+ * Flux Standard Action (FSA) compatible action type.
+ *
+ * @remarks
+ * Extends {@link Action} with optional FSA properties:
+ * - `payload` - The action's data payload
+ * - `meta` - Additional metadata
+ * - `error` - If true, `payload` is an Error object
+ *
+ * While not strictly required, keeping actions JSON serializable is
+ * highly recommended for debugging and time-travel features.
+ *
+ * @see {@link https://github.com/redux-utilities/flux-standard-action | FSA Spec}
  */
 export interface AnyAction extends Action {
   payload?: any;

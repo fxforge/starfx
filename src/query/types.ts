@@ -75,16 +75,14 @@ export interface FetchJson<ApiSuccess = any, ApiError = any> {
 }
 
 export interface FetchJsonCtx<P = any, ApiSuccess = any, ApiError = any>
-  extends FetchCtx<P>, FetchJson<ApiSuccess, ApiError> {}
+  extends FetchCtx<P>,
+    FetchJson<ApiSuccess, ApiError> {}
 
 /**
  * Full API context made available to mdw/api and endpoint handlers.
  */
-export interface ApiCtx<
-  Payload = any,
-  ApiSuccess = any,
-  ApiError = any,
-> extends FetchJsonCtx<Payload, ApiSuccess, ApiError> {
+export interface ApiCtx<Payload = any, ApiSuccess = any, ApiError = any>
+  extends FetchJsonCtx<Payload, ApiSuccess, ApiError> {
   actions: Action[];
   loader: Omit<LoaderPayload<any>, "id"> | null;
   // should we cache ctx.json?
@@ -137,10 +135,8 @@ export type CreateActionFn<ApiSuccess = any> = () => ActionWithPayload<
   CreateActionPayload<Record<string | number | symbol, never>, ApiSuccess>
 >;
 
-export interface CreateAction<
-  Ctx extends ThunkCtx = ThunkCtx,
-  ApiSuccess = any,
-> extends CreateActionFn<ApiSuccess> {
+export interface CreateAction<Ctx extends ThunkCtx = ThunkCtx, ApiSuccess = any>
+  extends CreateActionFn<ApiSuccess> {
   run: (
     p?: ActionWithPayload<
       CreateActionPayload<Record<string | number | symbol, never>, ApiSuccess>

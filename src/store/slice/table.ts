@@ -101,17 +101,73 @@ export interface TableOutput<
 }
 
 /**
- * Create a table-style slice (id -> entity map) with selectors and update helpers.
+ * Create a table-style slice for entity storage (id -> entity map).
  *
  * @remarks
- * The table slice exposes selectors (findById, selectTableAsList, etc.), CRUD-style
- * operations (`add`, `set`, `remove`, `patch`, `merge`) and an `empty` entity
- * fallback when requested.
+ * The table slice mimics a database table where entities are stored in a
+ * `Record<Id, Entity>` structure. It provides:
  *
+ * **Selectors:**
+ * - `selectTable` - Get the entire table object
+ * - `selectTableAsList` - Get all entities as an array
+ * - `selectById` - Get single entity by id (returns `empty` if not found)
+ * - `selectByIds` - Get multiple entities by ids
+ *
+ * **Updaters:**
+ * - `add` - Add or replace entities
+ * - `set` - Replace entire table
+ * - `remove` - Remove entities by ids
+ * - `patch` - Partially update entities
+ * - `merge` - Deep merge entities
+ * - `reset` - Reset to initial state
+ *
+ * **Empty value:**
+ * When `empty` is provided and `selectById` doesn't find an entity, it returns
+ * the empty value instead of `undefined`. This promotes safer code by providing
+ * stable assumptions about data shape (no optional chaining needed).
+ *
+ * @typeParam Entity - The entity type stored in the table.
+ * @typeParam S - The root state type.
+ * @param p - Table configuration.
  * @param p.name - The state key for this table.
  * @param p.initialState - Optional initial map of entities.
- * @param p.empty - Optional empty entity or factory used as a default for `selectById`.
- * @returns A `TableOutput` with selectors and mutation helpers.
+ * @param p.empty - Optional empty entity (or factory) returned for missing lookups.
+ * @returns A {@link TableOutput} with selectors and mutation helpers.
+ *
+ * @see {@link https://bower.sh/death-by-thousand-existential-checks | Why empty values matter}
+ * @see {@link https://bower.sh/entity-factories | Entity factories pattern}
+ *
+ * @example Basic usage
+ * ```ts
+ * interface User {
+ *   id: string;
+ *   name: string;
+ *   email: string;
+ * }
+ *
+ * const [schema, initialState] = createSchema({
+ *   users: slice.table<User>({ empty: { id: '', name: '', email: '' } }),
+ * });
+ *
+ * // Add users
+ * yield* schema.update(
+ *   schema.users.add({
+ *     '1': { id: '1', name: 'Alice', email: 'alice@example.com' },
+ *     '2': { id: '2', name: 'Bob', email: 'bob@example.com' },
+ *   })
+ * );
+ *
+ * // Get user (returns empty if not found)
+ * const user = yield* select(schema.users.selectById, { id: '1' });
+ *
+ * // Partial update
+ * yield* schema.update(
+ *   schema.users.patch({ '1': { name: 'Alice Smith' } })
+ * );
+ *
+ * // Remove users
+ * yield* schema.update(schema.users.remove(['2']));
+ * ```
  */
 export function createTable<
   Entity extends AnyState = AnyState,

@@ -1,9 +1,8 @@
 import type { AnyState } from "../../types.js";
 import type { BaseSchema } from "../types.js";
 
-export interface StrOutput<
-  S extends AnyState = AnyState,
-> extends BaseSchema<string> {
+export interface StrOutput<S extends AnyState = AnyState>
+  extends BaseSchema<string> {
   schema: "str";
   initialState: string;
   set: (v: string) => (s: S) => void;

@@ -10,17 +10,42 @@ import type { FxStore, StoreUpdater, UpdaterCtx } from "./types.js";
 /**
  * Apply a store updater within the current store context.
  *
+ * @remarks
+ * This is one of three ways to update state in starfx. The recommended approach
+ * is to use `schema.update()` which provides full type safety. This function is
+ * more generic and requires manual type annotation.
+ *
+ * Updater functions receive an `immer` draft and can mutate it directly.
+ * Any mutations are captured and applied immutably to the real state.
+ *
  * @typeParam S - Root state shape.
  * @param updater - Updater function or array of updaters to apply.
  * @returns The update context produced by the store.
  *
- * @example
- * ```ts
- * // apply a simple raw updater
- * yield* updateStore([(s: any) => { s.counter = (s.counter || 0) + 1 }]);
+ * @see {@link https://immerjs.github.io/immer/update-patterns | Immer update patterns}
  *
- * // apply a schema-provided updater helper
- * yield* updateStore([schema.users.add({ [user.id]: user })]);
+ * @example Basic counter increment
+ * ```ts
+ * function* inc() {
+ *   yield* updateStore((state) => {
+ *     state.counter += 1;
+ *   });
+ * }
+ * ```
+ *
+ * @example Using schema updater helpers
+ * ```ts
+ * function* addUser(user: User) {
+ *   yield* updateStore(schema.users.add({ [user.id]: user }));
+ * }
+ * ```
+ *
+ * @example Batch multiple updates
+ * ```ts
+ * yield* updateStore([
+ *   schema.users.add({ [user.id]: user }),
+ *   schema.loaders.success({ id: 'fetch-user' }),
+ * ]);
  * ```
  */
 export function* updateStore<S extends AnyState>(
@@ -36,15 +61,41 @@ export function* updateStore<S extends AnyState>(
 /**
  * Evaluate a selector against the current store state.
  *
+ * @remarks
+ * Selectors are functions that derive data from the store state. They encapsulate
+ * logic for looking up specific values and can be memoized using `createSelector`
+ * from reselect (re-exported by starfx).
+ *
+ * This is an Operation that must be yielded inside an Effection scope (typically a thunk/api).
+ *
+ * @typeParam S - The state shape.
+ * @typeParam R - The return type of the selector.
+ * @typeParam P - Optional parameter type for parameterized selectors.
  * @param selectorFn - Selector function to evaluate.
  * @param p - Optional parameter passed to the selector.
+ * @returns The result of calling the selector with current state.
  *
- * @example
+ * @see {@link createSelector} for memoized selectors.
+ *
+ * @example Basic selector usage
  * ```ts
  * // return an array of users
  * const users = yield* select(schema.users.selectTableAsList);
+ * ```
+ *
+ * @example Parameterized selector
+ * ```ts
  * // return a single user by id
  * const user = yield* select(schema.users.selectById, { id: '1' });
+ * ```
+ *
+ * @example With custom selector
+ * ```ts
+ * const selectActiveUsers = createSelector(
+ *   schema.users.selectTableAsList,
+ *   (users) => users.filter(u => u.isActive)
+ * );
+ * const activeUsers = yield* select(selectActiveUsers);
  * ```
  */
 export function select<S, R>(selectorFn: (s: S) => R): Operation<R>;
@@ -64,15 +115,31 @@ export function* select<S, R, P>(
  * Wait for a loader associated with `action` to enter a terminal state
  * (`success` or `error`).
  *
- * @param loaders - The loader slice instance.
+ * @remarks
+ * Loaders are "status trackers" that monitor the lifecycle of thunks and
+ * endpoints. They track loading, success, and error states along with
+ * timestamps and optional metadata.
+ *
+ * This function polls the loader state on every action until it reaches
+ * a terminal state (success or error).
+ *
+ * @typeParam M - The loader metadata shape.
+ * @param loaders - The loader slice instance from your schema.
  * @param action - The action or action-creator which identifies the loader.
- * @returns The final loader state.
+ * @returns The final {@link LoaderState} with helper booleans (`isSuccess`, `isError`, etc.).
+ *
+ * @see {@link waitForLoaders} for waiting on multiple loaders.
+ * @see {@link LoaderState} for the shape of the returned state.
  *
  * @example
  * ```ts
  * // wait until the loader for `fetchUsers()` completes
  * const loader = yield* waitForLoader(schema.loaders, fetchUsers());
- * if (loader.isSuccess) { // handle success }
+ * if (loader.isSuccess) {
+ *   console.log('Users fetched successfully');
+ * } else if (loader.isError) {
+ *   console.error('Failed:', loader.message);
+ * }
  * ```
  */
 export function* waitForLoader<M extends AnyState>(

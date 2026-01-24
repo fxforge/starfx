@@ -1,10 +1,8 @@
 import type { AnyState } from "../../types.js";
 import type { BaseSchema } from "../types.js";
 
-export interface ObjOutput<
-  V extends AnyState,
-  S extends AnyState,
-> extends BaseSchema<V> {
+export interface ObjOutput<V extends AnyState, S extends AnyState>
+  extends BaseSchema<V> {
   schema: "obj";
   initialState: V;
   set: (v: V) => (s: S) => void;

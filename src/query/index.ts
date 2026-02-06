@@ -7,6 +7,6 @@ export * from "./create-key.js";
 export { createThunks, type ThunksApi };
 
 /**
- * @deprecated Use {@link createThunks} instead;
+ * @deprecated Use {@link createThunks} instead. This alias will be removed in a future version.
  */
 export const createPipe = createThunks;

@@ -3,6 +3,9 @@ import type { AnyState, Next } from "../types.js";
 import { select, updateStore } from "./fx.js";
 import type { UpdaterCtx } from "./types.js";
 
+/**
+ * Loader id used internally by the persistence system to track rehydration status.
+ */
 export const PERSIST_LOADER_ID = "@@starfx/persist";
 
 export interface PersistAdapter<S extends AnyState> {
@@ -24,6 +27,12 @@ interface TransformFunctions<S extends AnyState> {
   out(s: Partial<S>): Partial<S>;
 }
 
+/**
+ * Create a transform object for persistence that can alter the shape of the
+ * state when saving or loading.
+ *
+ * @returns An object with `.in` and `.out` transformer functions.
+ */
 export function createTransform<S extends AnyState>() {
   const transformers: TransformFunctions<S> = {
     in: (currentState: Partial<S>): Partial<S> => currentState,
@@ -73,6 +82,48 @@ export function shallowReconciler<S extends AnyState>(
   return { ...original, ...persisted };
 }
 
+/**
+ * Create a persistor for state rehydration from storage.
+ *
+ * @remarks
+ * The persistor provides a `rehydrate` operation that:
+ * 1. Reads persisted state from the adapter
+ * 2. Applies optional `transform.out` to the loaded data
+ * 3. Merges with current state using the reconciler
+ * 4. Updates the store with the merged state
+ *
+ * The persistence system uses a special loader (`PERSIST_LOADER_ID`) to
+ * track rehydration status, which {@link PersistGate} uses to delay
+ * rendering until rehydration completes.
+ *
+ * @typeParam S - The state shape.
+ * @param options - Persistor configuration.
+ * @param options.adapter - Storage adapter (e.g., localStorage, AsyncStorage).
+ * @param options.key - Storage key for persisted data (default: 'starfx').
+ * @param options.reconciler - Function to merge original and rehydrated state.
+ * @param options.allowlist - Keys to persist (empty = persist entire state).
+ * @param options.transform - Optional transformers for inbound/outbound shapes.
+ * @returns Persistor properties including the `rehydrate` operation.
+ *
+ * @see {@link createLocalStorageAdapter} for browser storage.
+ * @see {@link PersistGate} for React integration.
+ * @see {@link shallowReconciler} for the default merge strategy.
+ *
+ * @example Basic setup
+ * ```ts
+ * import { createPersistor, createLocalStorageAdapter } from 'starfx';
+ *
+ * const persistor = createPersistor({
+ *   adapter: createLocalStorageAdapter(),
+ *   key: 'my-app',
+ *   allowlist: ['users', 'settings'],
+ *   reconciler: shallowReconciler,
+ * });
+ *
+ * // In your app initialization
+ * store.run(persistor.rehydrate);
+ * ```
+ */
 export function createPersistor<S extends AnyState>({
   adapter,
   key = "starfx",
@@ -117,6 +168,13 @@ export function createPersistor<S extends AnyState>({
   };
 }
 
+/**
+ * Middleware that persists the store state after each update.
+ *
+ * @remarks
+ * Applies an optional inbound transform and either persists the entire state
+ * (when `allowlist` is empty) or only the listed keys.
+ */
 export function persistStoreMdw<S extends AnyState>({
   allowlist,
   adapter,

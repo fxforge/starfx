@@ -10,6 +10,13 @@ export interface StrOutput<S extends AnyState = AnyState>
   select: (s: S) => string;
 }
 
+/**
+ * Create a string slice with set/reset/select helpers.
+ *
+ * @param name - State key for this slice.
+ * @param initialState - Optional initial string value (defaults to empty string).
+ * @returns A `StrOutput` containing setters and selector helpers.
+ */
 export function createStr<S extends AnyState = AnyState>({
   name,
   initialState = "",
@@ -33,6 +40,11 @@ export function createStr<S extends AnyState = AnyState>({
   };
 }
 
+/**
+ * Shortcut for creating a `str` slice when building schema definitions.
+ *
+ * @param initialState - Optional initial string value.
+ */
 export function str(initialState?: string) {
   return (name: string) => createStr<AnyState>({ name, initialState });
 }

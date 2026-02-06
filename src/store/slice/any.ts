@@ -9,6 +9,13 @@ export interface AnyOutput<V, S extends AnyState> extends BaseSchema<V> {
   select: (s: S) => V;
 }
 
+/**
+ * Create a generic slice for any arbitrary value.
+ *
+ * @param name - The state key for this slice.
+ * @param initialState - The initial value for the slice.
+ * @returns An `AnyOutput` providing setter, reset, and selector helpers.
+ */
 export function createAny<V, S extends AnyState = AnyState>({
   name,
   initialState,
@@ -32,6 +39,11 @@ export function createAny<V, S extends AnyState = AnyState>({
   };
 }
 
+/**
+ * Shortcut to define an `any` slice for schema creation.
+ *
+ * @param initialState - The initial value for the slice.
+ */
 export function any<V>(initialState: V) {
   return (name: string) => createAny<V, AnyState>({ name, initialState });
 }

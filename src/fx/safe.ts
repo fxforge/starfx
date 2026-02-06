@@ -1,5 +1,5 @@
 import type { Operation, Result } from "effection";
-import { Err, Ok, call } from "effection";
+import { Err, Ok, scoped } from "effection";
 
 /**
  * The goal of `safe` is to wrap Operations to prevent them from raising
@@ -27,7 +27,7 @@ export function* safe<T, TArgs extends unknown[] = []>(
   operator: (...args: TArgs) => Operation<T>,
 ): Operation<Result<T>> {
   try {
-    const value = yield* call(operator);
+    const value = yield* scoped(operator);
     return Ok(value);
   } catch (error) {
     return Err(isError(error) ? error : new Error(String(error)));

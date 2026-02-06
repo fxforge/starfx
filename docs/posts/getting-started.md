@@ -102,7 +102,7 @@ const fetchRepo = api.get(
   api.cache(),
 );
 
-store.run(api.register);
+store.initialize(api.register);
 
 function App() {
   return (

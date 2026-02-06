@@ -1,5 +1,5 @@
 {
-  "name": "starfx-parcel",
+  "name": "parcel-react",
   "source": "src/index.html",
   "scripts": {
     "start": "parcel --host 0.0.0.0",

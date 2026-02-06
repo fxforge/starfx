@@ -34,12 +34,12 @@ const jsonBlob = (data: any) => {
 };
 
 const testStore = () => {
-  const [schema, initialState] = createSchema({
+  const schema = createSchema({
     users: slice.table<User>({ empty: emptyUser }),
     loaders: slice.loaders(),
     cache: slice.table({ empty: {} }),
   });
-  const store = createStore({ initialState });
+  const store = createStore({ schemas: [schema] });
   return { schema, store };
 };
 
@@ -517,14 +517,13 @@ test("errorHandler", () => {
   );
 
   const store = createStore({
-    initialState: {
-      users: {},
-    },
+    schemas: [createSchema()],
   });
   store.run(query.register);
   store.dispatch(fetchUsers());
   expect(store.getState()).toEqual({
-    users: {},
+    cache: {},
+    loaders: {},
   });
   expect(a).toEqual(2);
 });

@@ -1,12 +1,9 @@
-import { api, initialState as schemaInitialState } from "./api";
+import { api, schema } from "./api";
 import { createStore } from "starfx";
 
-export function setupStore({ initialState = {} }) {
+export function setupStore({ initialState = {} } = {}) {
   const store = createStore({
-    initialState: {
-      ...schemaInitialState,
-      ...initialState,
-    },
+    schemas: [schema],
   });
 
   store.run(api.register);

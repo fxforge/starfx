@@ -13,11 +13,11 @@ const baseUrl = "https://starfx.com";
 const mockUser = { id: "1", email: "test@starfx.com" };
 
 const testStore = () => {
-  const [schema, initialState] = createSchema({
+  const schema = createSchema({
     loaders: slice.loaders(),
     cache: slice.table({ empty: {} }),
   });
-  const store = createStore({ initialState });
+  const store = createStore({ schemas: [schema] });
   return { schema, store };
 };
 

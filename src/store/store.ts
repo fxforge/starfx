@@ -36,6 +36,51 @@ export interface CreateStore<S extends AnyState> {
 
 export const IdContext = createContext("starfx:id", 0);
 
+/**
+ * Creates a new FxStore instance for managing application state.
+ *
+ * @remarks
+ * The store wraps an Effection scope and provides state management primitives,
+ * listener registration, middleware application, and a `run` helper for
+ * executing operations within the store's scope.
+ *
+ * Unlike traditional Redux stores, this store does not use reducers. Instead,
+ * state updates are performed using `immer`-based updater functions that directly
+ * mutate a draft state. This design is inspired by the observation that reducers
+ * were originally created to ensure immutability, but with `immer` that concern
+ * is handled automatically.
+ *
+ * @typeParam S - The shape of the root state object.
+ *
+ * @param options - Store configuration object.
+ * @param options.initialState - The initial state for the store.
+ * @param options.scope - Optional Effection scope to use. If omitted, a new scope is created.
+ * @param options.middleware - Optional array of store middleware.
+ * @returns A fully configured {@link FxStore} instance.
+ *
+ * @see {@link createSchema} for creating the schema and initial state.
+ * @see {@link https://immerjs.github.io/immer/update-patterns | Immer update patterns}
+ *
+ * @example
+ * ```ts
+ * import { createSchema, createStore, slice } from "starfx";
+ *
+ * interface User {
+ *   id: string;
+ *   name: string;
+ * }
+ *
+ * const [schema, initialState] = createSchema({
+ *   cache: slice.table(),
+ *   loaders: slice.loaders(),
+ *   users: slice.table<User>(),
+ * });
+ *
+ * const store = createStore({ initialState });
+ * store.run(api.register);
+ * store.dispatch(fetchUsers());
+ * ```
+ */
 export function createStore<S extends AnyState>({
   initialState,
   scope: initScope,

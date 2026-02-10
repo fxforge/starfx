@@ -1,6 +1,13 @@
 import type { Resolve, Subscription } from "effection";
 import { action, resource } from "effection";
 
+/**
+ * Create a durable publish-subscribe signal with replay semantics.
+ *
+ * @typeParam T - Value type sent to subscribers.
+ * @typeParam TClose - Optional close value type.
+ * @returns A resource-style `subscribe` plus `send` and `close` helpers. New subscribers will receive previously sent items (replayed).
+ */
 export function createReplaySignal<T, TClose>() {
   const subscribers = new Set<Subscription<T, TClose>>();
   // single shared durable queue storage

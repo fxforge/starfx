@@ -25,7 +25,7 @@ import { Err, Ok, call } from "effection";
  * import { safe } from 'starfx';
  *
  * function* run() {
- *   const result = yield* safe(() => fetch('https://api.example.com/users'));
+ *   const result = yield* safe(() => until(fetch('https://api.example.com/users')));
  *
  *   if (result.ok) {
  *     console.log('Response:', result.value);

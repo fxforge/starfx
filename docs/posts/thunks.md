@@ -32,7 +32,7 @@ Each run of a thunk gets its own `ctx` object which provides a substrate to
 communicate between middleware.
 
 ```ts
-import { call, createThunks, mdw } from "starfx";
+import { until, createThunks, mdw } from "starfx";
 
 const thunks = createThunks();
 // catch errors from task and logs them with extra info
@@ -46,7 +46,7 @@ thunks.use(function* (ctx, next) {
 
 // create a thunk
 const log = thunks.create<string>("log", function* (ctx, next) {
-  const resp = yield* call(
+  const resp = yield* until(
     fetch("https://log-drain.com", {
       method: "POST",
       body: JSON.stringify({ message: ctx.payload }),

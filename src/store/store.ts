@@ -1,17 +1,23 @@
 import {
+  type Callable,
   Ok,
+  type Operation,
   type Scope,
+  type Task,
   createContext,
   createScope,
   createSignal,
+  each,
+  lift,
+  suspend,
 } from "effection";
-import { enablePatches, produceWithPatches } from "immer";
 import { API_ACTION_PREFIX, ActionContext, emit } from "../action.js";
-import { type BaseMiddleware, compose } from "../compose.js";
+import type { BaseMiddleware } from "../compose.js";
+import { createReplaySignal } from "../fx/replay-signal.js";
 import type { AnyAction, AnyState, Next } from "../types.js";
 import { StoreContext, StoreUpdateContext } from "./context.js";
 import { createRun } from "./run.js";
-import type { FxStore, Listener, StoreUpdater, UpdaterCtx } from "./types.js";
+import type { FxSchema, FxStore, Listener, UpdaterCtx } from "./types.js";
 const stubMsg = "This is merely a stub, not implemented";
 
 let id = 0;
@@ -30,16 +36,19 @@ function observable() {
 
 export interface CreateStore<S extends AnyState> {
   scope?: Scope;
-  initialState: S;
-  middleware?: BaseMiddleware<UpdaterCtx<S>>[];
+  schemas: FxSchema<S, any>[];
 }
 
 export const IdContext = createContext("starfx:id", 0);
 
+// Context to share store's tail middleware with schemas
+export const StoreTailMdwContext = createContext<
+  BaseMiddleware<UpdaterCtx<AnyState>>[]
+>("starfx:store-tail-mdw", [] as BaseMiddleware<UpdaterCtx<AnyState>>[]);
+
 export function createStore<S extends AnyState>({
-  initialState,
   scope: initScope,
-  middleware = [],
+  schemas,
 }: CreateStore<S>): FxStore<S> {
   let scope: Scope;
   if (initScope) {
@@ -49,11 +58,15 @@ export function createStore<S extends AnyState>({
     scope = tuple[0];
   }
 
+  // Build initial state from all schemas
+  const initialState = schemas.reduce((acc, schema) => {
+    return Object.assign(acc, schema.initialState);
+  }, {} as AnyState) as S;
   let state = initialState;
   const listeners = new Set<Listener>();
-  enablePatches();
 
   const signal = createSignal<AnyAction, void>();
+  const watch = createReplaySignal<any, void>();
   scope.set(ActionContext, signal);
   scope.set(IdContext, id++);
 
@@ -65,34 +78,25 @@ export function createStore<S extends AnyState>({
     return state;
   }
 
+  function setState(newState: S) {
+    state = newState;
+  }
+
+  function getInitialState() {
+    return initialState;
+  }
+
   function subscribe(fn: Listener) {
     listeners.add(fn);
     return () => listeners.delete(fn);
   }
 
-  function* updateMdw(ctx: UpdaterCtx<S>, next: Next) {
-    const upds: StoreUpdater<S>[] = [];
-
-    if (Array.isArray(ctx.updater)) {
-      upds.push(...ctx.updater);
-    } else {
-      upds.push(ctx.updater);
-    }
-
-    const [nextState, patches, _] = produceWithPatches(getState(), (draft) => {
-      // TODO: check for return value inside updater
-      upds.forEach((updater) => updater(draft as any));
-    });
-    ctx.patches = patches;
-
-    // set the state!
-    state = nextState;
-
-    yield* next();
+  function dispatch(action: AnyAction | AnyAction[]) {
+    emit({ signal, action });
   }
 
   function* logMdw(ctx: UpdaterCtx<S>, next: Next) {
-    dispatch({
+    yield* lift(dispatch)({
       type: `${API_ACTION_PREFIX}store`,
       payload: ctx,
     });
@@ -110,69 +114,67 @@ export function createStore<S extends AnyState>({
     yield* next();
   }
 
-  function createUpdater() {
-    const fn = compose<UpdaterCtx<S>>([
-      updateMdw,
-      ...middleware,
-      logMdw,
-      notifyChannelMdw,
-      notifyListenersMdw,
-    ]);
+  // Set the store's tail middleware in context for schemas to use
+  const storeTailMdw: BaseMiddleware<UpdaterCtx<S>>[] = [
+    logMdw,
+    notifyChannelMdw,
+    notifyListenersMdw,
+  ];
+  scope.set(
+    StoreTailMdwContext,
+    storeTailMdw as BaseMiddleware<UpdaterCtx<AnyState>>[],
+  );
 
-    return fn;
-  }
-
-  const mdw = createUpdater();
-  function* update(updater: StoreUpdater<S> | StoreUpdater<S>[]) {
-    const ctx = {
-      updater,
-      patches: [],
-      result: Ok(undefined),
-    };
-
-    yield* mdw(ctx);
-
-    if (!ctx.result.ok) {
-      dispatch({
-        type: `${API_ACTION_PREFIX}store`,
-        payload: ctx.result.error,
-      });
+  function manage<Resource>(name: string, inputResource: Operation<Resource>) {
+    const CustomContext = createContext<Resource>(name);
+    function* manager() {
+      const providedResource = yield* inputResource;
+      scope.set(CustomContext, providedResource);
+      yield* suspend();
     }
+    watch.send(manager);
 
-    return ctx;
+    // returns to the user so they can use this resource from
+    //  anywhere this context is available
+    return CustomContext;
   }
 
-  function dispatch(action: AnyAction | AnyAction[]) {
-    emit({ signal, action });
-  }
+  const run = createRun(scope);
 
-  function getInitialState() {
-    return initialState;
-  }
-
-  function* reset(ignoreList: (keyof S)[] = []) {
-    return yield* update((s) => {
-      const keep = ignoreList.reduce<S>(
-        (acc, key) => {
-          acc[key] = s[key];
-          return acc;
-        },
-        { ...initialState },
-      );
-
-      Object.keys(s).forEach((key: keyof S) => {
-        s[key] = keep[key];
+  function initialize<T>(op: () => Operation<T>): Task<void> {
+    return scope.run(function* (): Operation<void> {
+      yield* scope.spawn(function* () {
+        for (const watched of yield* each(watch)) {
+          yield* scope.spawn(watched);
+          yield* each.next();
+        }
       });
+      yield* op();
     });
   }
+
+  // Use the first schema as the default
+  const schema: FxSchema<S, any> = schemas[0] as FxSchema<S, any>;
+
+  // Build schemas map by name for selective access
+  const schemasMap = schemas.reduce(
+    (acc, s) => {
+      acc[s.name] = s as FxSchema<any, any>;
+      return acc;
+    },
+    {} as Record<string, FxSchema<any, any>>,
+  );
 
   const store: FxStore<S> = {
     getScope,
     getState,
+    setState,
     subscribe,
-    update,
-    reset,
-    run: createRun(scope),
+    initialize,
+    manage,
+    schema,
+    schemas: schemasMap,
+    run,
     // instead of actions relating to store mutation, they
     // refer to pieces of business logic -- that can also mutate state
     dispatch,

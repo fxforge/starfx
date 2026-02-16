@@ -1,4 +1,5 @@
-import { configureStore, updateStore } from "../../../store/index.js";
+import { createStore, updateStore } from "../../../store/index.js";
+import { createSchema } from "../../../store/schema.js";
 import { expect, test } from "../../../test.js";
 
 import { createObj } from "../../../store/slice/obj.js";
@@ -24,10 +25,11 @@ const slice = createObj<ICurrentUser>({
 });
 
 test("sets up an obj", async () => {
-  const store = configureStore({
-    initialState: {
-      [NAME]: crtInitialState,
-    },
+  const schema = createSchema({
+    [NAME]: () => slice,
+  });
+  const store = createStore({
+    schemas: [schema],
   });
 
   await store.run(function* () {

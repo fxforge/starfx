@@ -1,7 +1,7 @@
-import { spawn, suspend } from "effection";
+import { spawn } from "effection";
 import type { AnyAction } from "../index.js";
 import { sleep, take, takeEvery, takeLatest, takeLeading } from "../index.js";
-import { createStore } from "../store/index.js";
+import { createSchema, createStore } from "../store/index.js";
 import { expect, test } from "../test.js";
 
 test("should cancel previous tasks and only use latest", async () => {
@@ -19,7 +19,7 @@ test("should cancel previous tasks and only use latest", async () => {
     yield* take("CANCEL_WATCHER");
     yield* task.halt();
   }
-  const store = createStore({ initialState: {} });
+  const store = createStore({ schemas: [createSchema()] });
   const task = store.run(root);
 
   store.dispatch({ type: "ACTION", payload: "1" });
@@ -48,7 +48,7 @@ test("should keep first action and discard the rest", async () => {
     yield* sleep(150);
     yield* task.halt();
   }
-  const store = createStore({ initialState: {} });
+  const store = createStore({ schemas: [createSchema()] });
   const task = store.run(root);
 
   store.dispatch({ type: "ACTION", payload: "1" });
@@ -78,7 +78,7 @@ test("should receive all actions", async () => {
     actual.push([arg1, arg2, action.payload]);
   }
 
-  const store = createStore({ initialState: {} });
+  const store = createStore({ schemas: [createSchema()] });
   const task = store.run(root);
 
   for (let i = 1; i <= loop / 2; i += 1) {

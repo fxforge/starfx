@@ -33,12 +33,12 @@ const emptyUser: User = { id: "", name: "", email: "" };
 const mockUser: User = { id: "1", name: "test", email: "test@test.com" };
 
 const testStore = () => {
-  const [schema, initialState] = createSchema({
+  const schema = createSchema({
     users: slice.table<User>({ empty: emptyUser }),
     loaders: slice.loaders(),
     cache: slice.table({ empty: {} }),
   });
-  const store = createStore({ initialState });
+  const store = createStore({ schemas: [schema] });
   return { schema, store };
 };
 
@@ -100,7 +100,10 @@ test("POST", async () => {
     },
   );
 
-  const store = createStore({ initialState: { users: {} } });
+  const schema = createSchema({
+    users: slice.table<User>(),
+  });
+  const store = createStore({ schemas: [schema] });
   store.run(query.register);
 
   store.dispatch(createUser({ email: mockUser.email }));
@@ -163,7 +166,7 @@ test("POST with uri", () => {
     },
   );
 
-  const store = createStore({ initialState: { users: {} } });
+  const store = createStore({ schemas: [createSchema()] });
   store.run(query.register);
   store.dispatch(createUser({ email: mockUser.email }));
 });
@@ -184,7 +187,7 @@ test("middleware - with request fn", () => {
     { supervisor: takeEvery },
     query.request({ method: "POST" }),
   );
-  const store = createStore({ initialState: { users: {} } });
+  const store = createStore({ schemas: [createSchema()] });
   store.run(query.register);
   store.dispatch(createUser());
 });
@@ -213,7 +216,7 @@ test("run() on endpoint action - should run the effect", () => {
     },
   );
 
-  const store = createStore({ initialState: { users: {} } });
+  const store = createStore({ schemas: [createSchema()] });
   store.run(api.register);
   store.dispatch(action2());
 });
@@ -257,7 +260,7 @@ test("run() from a normal saga", async () => {
     yield* takeEvery(action2, onAction);
   }
 
-  const store = createStore({ initialState: { users: {} } });
+  const store = createStore({ schemas: [createSchema()] });
   store.run(() => keepAlive([api.register, watchAction]));
   store.dispatch(action2());
 
@@ -395,7 +398,7 @@ test("ensure types for get() endpoint", () => {
     },
   );
 
-  const store = createStore({ initialState: { users: {} } });
+  const store = createStore({ schemas: [createSchema()] });
   store.run(api.register);
 
   store.dispatch(action1({ id: "1" }));
@@ -433,7 +436,7 @@ test("ensure ability to cast `ctx` in function definition", () => {
     },
   );
 
-  const store = createStore({ initialState: { users: {} } });
+  const store = createStore({ schemas: [createSchema()] });
   store.run(api.register);
   store.dispatch(action1({ id: "1" }));
   expect(acc).toEqual(["1", "wow"]);
@@ -466,7 +469,7 @@ test("ensure ability to cast `ctx` in function definition with no props", () => 
     },
   );
 
-  const store = createStore({ initialState: { users: {} } });
+  const store = createStore({ schemas: [createSchema()] });
   store.run(api.register);
   store.dispatch(action1());
   expect(acc).toEqual(["wow"]);
@@ -530,7 +533,7 @@ test("useCache - derive api success from endpoint", () => {
     },
   );
 
-  const store = createStore({ initialState: { users: {} } });
+  const store = createStore({ schemas: [createSchema()] });
   store.run(api.register);
 
   function _App() {

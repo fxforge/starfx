@@ -8,12 +8,12 @@ interface User {
 }
 
 const emptyUser: User = { id: "", name: "", age: 0 };
-export const [schema, initialState] = createSchema({
+export const schema = createSchema({
   users: slice.table({ empty: emptyUser }),
   cache: slice.table(),
   loaders: slice.loaders(),
 });
-export type AppState = typeof initialState;
+export type AppState = typeof schema.initialState;
 
 export const api = createApi();
 api.use(mdw.api({ schema }));

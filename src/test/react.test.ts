@@ -5,11 +5,11 @@ import { expect, test } from "../test.js";
 
 // typing test
 test("react types", () => {
-  const [schema, initialState] = createSchema({
+  const schema = createSchema({
     cache: slice.table(),
     loaders: slice.loaders(),
   });
-  const store = createStore({ initialState });
+  const store = createStore({ schemas: [schema] });
   React.createElement(Provider, {
     schema,
     store,

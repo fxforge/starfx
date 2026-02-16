@@ -63,9 +63,11 @@ const fetchMail = thunks.create("fetch-mail", function* (ctx, next) {
   }
 
   const boxes = yield* select(schema.mailboxes.selectTableAsList);
-  const group = yield* parallel(boxes.map((box) => {
-    return fetchMessages.run({ id: box.id });
-  }));
+  const group = yield* parallel(
+    boxes.map((box) => {
+      return fetchMessages.run({ id: box.id });
+    }),
+  );
   const messages = yield* select(schema.messages.selectTableAsList);
   console.log(messages);
 });

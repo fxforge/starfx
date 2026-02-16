@@ -19,21 +19,22 @@ want to kill the child task tree, sometimes you want to recover and restart, and
 sometimes you want to bubble the error up the task ancestry.
 
 If you want to capture a task and prevent it from bubbling an exception up, then
-you have two `fx`: `call` and `safe`.
+you have two `fx`: `scoped` and `safe`.
 
 ```ts
-import { call, run, safe } from "starfx";
+import { safe } from "starfx";
+import { scoped, until, run } from "effection";
 
 function* main() {
   try {
-    // use `call` to enable JS try/catch
-    yield* call(fetch("api.com"));
+    // use `scoped` to enable JS try/catch
+    yield* scoped(() => until(fetch("api.com")));
   } catch (err) {
     console.error(err);
   }
 
   // -or- if you don't want to use try/catch
-  const result = yield* safe(fetch("api.com"));
+  const result = yield* safe(() => until(fetch("api.com")));
   if (!result.ok) {
     console.error(result.err);
   }

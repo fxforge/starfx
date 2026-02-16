@@ -13,6 +13,11 @@ type SubPattern<Guard extends AnyAction = AnyAction> =
   | Predicate<Guard>
   | StringableActionCreator
   | ActionType;
+/**
+ * A `Pattern` can be an action type string, an action creator, a predicate
+ * function, or an array containing any of those. It is used to match actions
+ * in listeners and middleware.
+ */
 export type Pattern = SubPattern | SubPattern[];
 type ActionSubPattern<Guard extends AnyAction = AnyAction> =
   | GuardPredicate<Guard, AnyAction>
@@ -37,6 +42,12 @@ function isActionCreator(fn: any): boolean {
   return !!fn && fn._starfx === true;
 }
 
+/**
+ * Build a predicate that returns `true` when an action matches `pattern`.
+ *
+ * @param pattern - A string, action-creator, predicate, or array of those.
+ * @returns A predicate function accepting an action and returning a boolean.
+ */
 export function matcher(pattern: ActionPattern): Predicate {
   if (pattern === "*") {
     return (input) => !!input;

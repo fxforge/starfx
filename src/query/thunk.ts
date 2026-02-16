@@ -28,11 +28,42 @@ import type {
   ThunkCtx,
 } from "./types.js";
 
+/**
+ * API for creating and managing thunk-style actions.
+ *
+ * @remarks
+ * Use {@link createThunks} (or {@link createApi}) to obtain an instance of this API.
+ * The ThunksApi provides:
+ * - `use()` for registering middleware
+ * - `create()` for creating typed action creators with associated handlers
+ * - `routes()` for the middleware router
+ * - `register()` for connecting to the store
+ * - `manage()` for handling and exposing Effection resources
+ *
+ * Each created thunk is an action creator that can be dispatched to trigger
+ * its middleware handler.
+ *
+ * @typeParam Ctx - The context type extending {@link ThunkCtx}.
+ *
+ * @see {@link createThunks} for creating a ThunksApi instance.
+ * @see {@link createApi} for HTTP-specific thunks.
+ */
 export interface ThunksApi<Ctx extends ThunkCtx> {
+  /** Register a middleware function into the pipeline. */
   use: (fn: Middleware<Ctx>) => void;
+  /** Returns a middleware function that routes to action-specific middleware. */
   routes: () => Middleware<Ctx>;
+  /** Register the thunks with the current store scope. */
   register: () => Operation<void>;
+  /** Reset any dynamically bound middleware for created actions. */
   reset: () => void;
+  /**
+   * Start and expose an Effection resource within the store scope.
+   *
+   * @param name - unique name for the resource Context
+   * @param resource - an Effection Operation (usually created with `resource(...)`)
+   * @returns a `Context<Resource>` that can `get()` or `expect()`
+   */
   manage: <Resource>(
     name: string,
     resource: Operation<Resource>,
@@ -99,37 +130,104 @@ export interface ThunksApi<Ctx extends ThunkCtx> {
 type Visors = (scope: Scope) => () => Operation<void>;
 
 /**
- * Creates a middleware pipeline.
+ * Creates a middleware pipeline for thunks.
  *
  * @remarks
- * This middleware pipeline is almost exactly like koa's middleware system.
- * See {@link https://koajs.com}
+ * Thunks are the foundational processing units in starfx. They have access to all
+ * dispatched actions, the global state, and the full power of structured concurrency.
  *
- * @example
+ * Think of thunks as micro-controllers that can:
+ * - Update state (the only place where state mutations should occur)
+ * - Coordinate async operations with Effection
+ * - Call other thunks for composition
+ *
+ * The middleware system is similar to Koa/Express. Each middleware receives
+ * a context (`ctx`) and a `next` function. Calling `yield* next()` passes
+ * control to the next middleware. Not calling `next()` exits early.
+ *
+ * Every thunk requires a unique name/id which enables:
+ * - Better traceability and debugging
+ * - Naming convention abstractions (e.g., API routers)
+ * - Deterministic action types
+ *
+ * @typeParam Ctx - The context type extending {@link ThunkCtx}.
+ * @param options - Configuration options.
+ * @param options.supervisor - Default supervisor strategy (default: `takeEvery`).
+ * @returns A {@link ThunksApi} for creating and managing thunks.
+ *
+ * @see {@link https://koajs.com | Koa.js} for the middleware pattern inspiration.
+ * @see {@link createApi} for HTTP-specific thunks.
+ * @see {@link takeEvery}, {@link takeLatest}, {@link takeLeading} for supervisor strategies.
+ *
+ * @example Basic setup
  * ```ts
- * import { createThunks } from 'starfx';
+ * import { createThunks, mdw } from 'starfx';
  *
  * const thunks = createThunks();
- * thunks.use(function* (ctx, next) {
- *   console.log('beginning');
- *   yield* next();
- *   console.log('end');
- * });
+ * // Catch and log errors
+ * thunks.use(mdw.err);
+ * // Route to action-specific middleware
  * thunks.use(thunks.routes());
  *
- * const doit = thunks.create('do-something', function*(ctx, next) {
- *   console.log('middle');
+ * const log = thunks.create<string>('log', function* (ctx, next) {
+ *   console.log('Message:', ctx.payload);
  *   yield* next();
- *   console.log('middle end');
  * });
  *
- * // ...
+ * store.dispatch(log('Hello world'));
+ * ```
+ *
+ * @example Middleware execution order
+ * ```ts
+ * const thunks = createThunks();
+ *
+ * thunks.use(function* (ctx, next) {
+ *   console.log('1 - before');
+ *   yield* next();
+ *   console.log('4 - after');
+ * });
+ *
+ * thunks.use(thunks.routes());
+ *
+ * const doit = thunks.create('doit', function* (ctx, next) {
+ *   console.log('2 - handler before');
+ *   yield* next();
+ *   console.log('3 - handler after');
+ * });
  *
  * store.dispatch(doit());
- * // beginning
- * // middle
- * // middle end
- * // end
+ * // Output: 1 - before, 2 - handler before, 3 - handler after, 4 - after
+ * ```
+ *
+ * @example Custom supervisor
+ * ```ts
+ * import { takeLatest, takeLeading } from 'starfx';
+ *
+ * // Search with debounce-like behavior
+ * const search = thunks.create('search', { supervisor: takeLatest });
+ *
+ * // Prevent duplicate submissions
+ * const submitForm = thunks.create('submit', { supervisor: takeLeading });
+ * ```
+ *
+ * @example Type-safe payload
+ * ```ts
+ * interface CreateUserPayload {
+ *   name: string;
+ *   email: string;
+ * }
+ *
+ * const createUser = thunks.create<CreateUserPayload>(
+ *   'create-user',
+ *   function* (ctx, next) {
+ *     // ctx.payload is typed as CreateUserPayload
+ *     const { name, email } = ctx.payload;
+ *     yield* next();
+ *   }
+ * );
+ *
+ * createUser({ name: 'Alice', email: 'alice@example.com' }); // OK
+ * createUser({ name: 'Bob' }); // Type error: missing email
  * ```
  */
 export function createThunks<Ctx extends ThunkCtx = ThunkCtx<any>>(

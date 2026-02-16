@@ -22,11 +22,12 @@ If you want to capture a task and prevent it from bubbling an exception up, then
 you have two `fx`: `scoped` and `safe`.
 
 ```ts
-import { scoped, until, run, safe } from "starfx";
+import { safe } from "starfx";
+import { scoped, until, run } from "effection";
 
 function* main() {
   try {
-    // use `call` to enable JS try/catch
+    // use `scoped` to enable JS try/catch
     yield* scoped(() => until(fetch("api.com")));
   } catch (err) {
     console.error(err);

@@ -32,7 +32,8 @@ Each run of a thunk gets its own `ctx` object which provides a substrate to
 communicate between middleware.
 
 ```ts
-import { until, createThunks, mdw } from "starfx";
+import { until } from "effection";
+import { createThunks, mdw } from "starfx";
 
 const thunks = createThunks();
 // catch errors from task and logs them with extra info

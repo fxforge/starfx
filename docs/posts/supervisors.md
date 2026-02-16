@@ -13,7 +13,7 @@ The most basic version of a supervisor is simply an infinite loop that calls a
 child task:
 
 ```ts
-import { call } from "starfx";
+import { call, sleep } from "effection";
 
 function* supervisor() {
   while (true) {
@@ -38,7 +38,8 @@ Building on top of that simple supervisor, we can have tasks that always listen
 for events and if they fail, restart them.
 
 ```ts
-import { parallel, run, take } from "starfx";
+import { parallel, take } from "starfx";
+import { run } from "effection";
 
 function* watchFetch() {
   while (true) {
@@ -53,9 +54,7 @@ function* send() {
   yield* put({ type: "FETCH_USERS" });
 }
 
-await run(
-  parallel([watchFetch, send]),
-);
+await run(parallel([watchFetch, send]));
 ```
 
 Here we create a supervisor function using a helper `take` to call a function

@@ -37,4 +37,4 @@ Here is a deep-dive on how we are using `starfx` in a production App at Aptible:
 This library is not possible without these foundational libraries:
 
 - [continuation](https://github.com/thefrontside/continuation)
-- [effection v3](https://github.com/thefrontside/effection/tree/v3)
+- [effection](https://frontside.com/effection)

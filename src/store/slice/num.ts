@@ -11,6 +11,13 @@ export interface NumOutput<S extends AnyState> extends BaseSchema<number> {
   select: (s: S) => number;
 }
 
+/**
+ * Create a numeric slice with helpers to increment/decrement/reset the value.
+ *
+ * @param name - The state key for this slice.
+ * @param initialState - Optional initial value (default: 0).
+ * @returns A `NumOutput` with numeric helpers and a selector.
+ */
 export function createNum<S extends AnyState = AnyState>({
   name,
   initialState = 0,
@@ -44,6 +51,11 @@ export function createNum<S extends AnyState = AnyState>({
   };
 }
 
+/**
+ * Shortcut to create a numeric slice for schema creation.
+ *
+ * @param initialState - Optional initial value for the slice.
+ */
 export function num(initialState?: number) {
   return (name: string) => createNum<AnyState>({ name, initialState });
 }

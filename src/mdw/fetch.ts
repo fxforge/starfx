@@ -5,8 +5,30 @@ import { isObject, noop } from "../query/util.js";
 import type { Next } from "../types.js";
 
 /**
- * This middleware converts the name provided to {@link createApi}
- * into `url` and `method` for the fetch request.
+ * Parse URL and HTTP method from the action name.
+ *
+ * @remarks
+ * This middleware extracts the URL pattern and HTTP method from the action name
+ * provided to {@link createApi}. The format is: `/path [METHOD]`
+ *
+ * It also performs URL parameter substitution, replacing `:param` placeholders
+ * with values from `ctx.payload`.
+ *
+ * Supported HTTP methods: GET, HEAD, POST, PUT, DELETE, CONNECT, OPTIONS, TRACE, PATCH
+ *
+ * This middleware is included in {@link mdw.api}.
+ *
+ * @typeParam Ctx - The fetch context type.
+ *
+ * @example How names are parsed
+ * ```ts
+ * // Name: '/users [GET]' -> url: '/users', method: 'GET'
+ * const fetchUsers = api.get('/users');
+ *
+ * // Name: '/users/:id [GET]' with payload { id: '123' }
+ * // -> url: '/users/123', method: 'GET'
+ * const fetchUser = api.get<{ id: string }>('/users/:id');
+ * ```
  */
 export function* nameParser<Ctx extends FetchJsonCtx = FetchJsonCtx>(
   ctx: Ctx,
@@ -56,8 +78,26 @@ export function* nameParser<Ctx extends FetchJsonCtx = FetchJsonCtx>(
 }
 
 /**
- * Automatically sets `content-type` to `application/json` when
- * that header is not already present.
+ * Set default Content-Type header to application/json.
+ *
+ * @remarks
+ * If `ctx.request` exists and doesn't have a `Content-Type` header set,
+ * this middleware adds `Content-Type: application/json`.
+ *
+ * This is useful as a default for JSON APIs but can be overridden by
+ * setting the header explicitly in your endpoint middleware.
+ *
+ * @typeParam CurCtx - The fetch context type.
+ *
+ * @example Override the default
+ * ```ts
+ * const uploadFile = api.post('/upload', function* (ctx, next) {
+ *   ctx.request = ctx.req({
+ *     headers: { 'Content-Type': 'multipart/form-data' },
+ *   });
+ *   yield* next();
+ * });
+ * ```
  */
 export function* headers<CurCtx extends FetchCtx = FetchCtx>(
   ctx: CurCtx,
@@ -79,11 +119,28 @@ export function* headers<CurCtx extends FetchCtx = FetchCtx>(
 }
 
 /**
- * This middleware takes the `ctx.response` and sets `ctx.json` to the body representation
- * requested.  It uses the `ctx.bodyType` property to determine how to represent the body.
- * The default is set to `json` which calls `Response.json()`.
+ * Parse the fetch response body and set `ctx.json`.
  *
- * @example
+ * @remarks
+ * Takes `ctx.response` and parses its body according to `ctx.bodyType`
+ * (default: 'json'). The result is stored in `ctx.json` as a {@link Result}:
+ * - `{ ok: true, value: data }` if response is OK and parsing succeeds
+ * - `{ ok: false, error: data }` if response is not OK
+ * - `{ ok: false, error: { message } }` if parsing fails
+ *
+ * Special case: HTTP 204 (No Content) returns an empty object.
+ *
+ * Change `ctx.bodyType` to use different Response methods:
+ * - 'json' -> `Response.json()`
+ * - 'text' -> `Response.text()`
+ * - 'blob' -> `Response.blob()`
+ * - etc.
+ *
+ * This middleware is part of {@link mdw.fetch}.
+ *
+ * @typeParam CurCtx - The fetch context type.
+ *
+ * @example Change body type
  * ```ts
  * const fetchUsers = api.get('/users', function*(ctx, next) {
  *  ctx.bodyType = 'text'; // calls Response.text();
@@ -153,15 +210,32 @@ export function composeUrl<CurCtx extends FetchJsonCtx = FetchJsonCtx>(
 }
 
 /**
- * If there's a slug inside the ctx.name (which is the URL segement in this case)
- * and there is *not* a corresponding truthy value in the payload, then that means
- * the user has an empty value (e.g. empty string) which means we want to abort the
- * fetch request.
+ * Validate URL parameters against payload values.
  *
- * e.g. `ctx.name = "/apps/:id"` with `payload = { id: '' }`
+ * @remarks
+ * Checks if the URL pattern contains parameter placeholders (`:param`) and
+ * validates that corresponding payload values are truthy. If a required
+ * parameter has a falsy value (empty string, null, undefined), the request
+ * is aborted early with an error in `ctx.json`.
  *
- * Ideally the action wouldn't have been dispatched at all but that is *not* a
- * gaurantee we can make here.
+ * This prevents accidental requests to URLs like `/users/undefined` when
+ * required data isn't available yet.
+ *
+ * This middleware is part of {@link mdw.fetch}.
+ *
+ * @typeParam CurCtx - The fetch context type.
+ *
+ * @example Automatic validation
+ * ```ts
+ * const fetchUser = api.get<{ id: string }>('/users/:id');
+ *
+ * // This works
+ * dispatch(fetchUser({ id: '123' }));
+ *
+ * // This bails early with error (no network request)
+ * dispatch(fetchUser({ id: '' }));
+ * // ctx.json = { ok: false, error: 'found :id in endpoint name...' }
+ * ```
  */
 export function* payload<CurCtx extends FetchJsonCtx = FetchJsonCtx>(
   ctx: CurCtx,

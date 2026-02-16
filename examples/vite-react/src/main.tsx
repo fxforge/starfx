@@ -13,7 +13,7 @@ function init() {
   // makes `fx` available in devtools
   (window as any).fx = store;
 
-  store.run([
+  store.initialize([
     function* logger() {
       while (true) {
         const action = yield* take("*");

@@ -11,7 +11,7 @@ function init() {
   const store = createStore({ initialState });
   window.fx = store;
 
-  store.run([
+  store.initialize([
     function* logger() {
       while (true) {
         const action = yield* take("*");

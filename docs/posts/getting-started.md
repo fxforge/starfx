@@ -143,6 +143,12 @@ yarn add starfx
 import * as starfx from "https://deno.land/x/starfx@0.13.2/mod.ts";
 ```
 
+**Note:** `starfx` has a peer dependency on `effection@^4` and `react-redux@^9`. Install it in your project:
+
+```bash
+npm install effection@^4 react-redux@^9
+```
+
 # Effection
 
 This library leverages structured concurrency using

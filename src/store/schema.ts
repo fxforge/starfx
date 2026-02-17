@@ -1,9 +1,7 @@
 import { updateStore } from "./fx.js";
-import { slice } from "./slice/index.js";
+import { loaders } from "./slice/loaders.js";
+import { table } from "./slice/table.js";
 import type { FxMap, FxSchema, StoreUpdater } from "./types.js";
-
-const defaultSchema = <O>(): O =>
-  ({ cache: slice.table(), loaders: slice.loaders() }) as O;
 
 /**
  * Creates a schema object and initial state from slice factories.
@@ -74,7 +72,9 @@ const defaultSchema = <O>(): O =>
 export function createSchema<
   O extends FxMap,
   S extends { [key in keyof O]: ReturnType<O[key]>["initialState"] },
->(slices: O = defaultSchema<O>()): [FxSchema<S, O>, S] {
+>(
+  slices: O = { cache: table(), loaders: loaders() } as O,
+): [FxSchema<S, O>, S] {
   const db = Object.keys(slices).reduce<FxSchema<S, O>>(
     (acc, key) => {
       (acc as any)[key] = slices[key](key);

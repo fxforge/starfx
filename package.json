@@ -36,6 +36,7 @@
     "@types/react": "^19.1.6",
     "@types/react-dom": "^19.1.5",
     "execa": "^9.6.0",
+    "effection": "4.0.2",
     "nock": "^14.0.5",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",

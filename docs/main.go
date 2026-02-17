@@ -111,6 +111,11 @@ func main() {
 						Page: pager("fx.md"),
 					},
 					{
+						Text: "Managing Resources",
+						Href: "/managing-resources",
+						Page: pager("managing-resources.md"),
+					},
+					{
 						Text: "Error Handling",
 						Href: "/error-handling",
 						Page: pager("error-handling.md"),

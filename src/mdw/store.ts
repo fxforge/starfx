@@ -6,17 +6,14 @@ import {
   select,
   updateStore,
 } from "../store/index.js";
-import type { AnyState, Next } from "../types.js";
+import type { AnyState, LoaderState, Next } from "../types.js";
 import { nameParser } from "./fetch.js";
 import { actions, customKey, err, queryCtx } from "./query.js";
 
-export interface ApiMdwProps<
-  Ctx extends ApiCtx = ApiCtx,
-  M extends AnyState = AnyState,
-> {
+export interface ApiMdwProps<Ctx extends ApiCtx = ApiCtx> {
   schema: {
-    loaders: LoaderOutput<M, AnyState>;
-    cache: TableOutput<any, AnyState>;
+    loaders: LoaderOutput;
+    cache: TableOutput;
   };
   errorFn?: (ctx: Ctx) => string;
 }
@@ -44,9 +41,7 @@ function isErrorLike(err: unknown): err is ErrorLike {
  *  - {@link mdw.loaderApi}
  *  - {@link mdw.cache}
  */
-export function api<Ctx extends ApiCtx = ApiCtx, S extends AnyState = AnyState>(
-  props: ApiMdwProps<Ctx, S>,
-) {
+export function api<Ctx extends ApiCtx = ApiCtx>(props: ApiMdwProps<Ctx>) {
   return compose<Ctx>([
     err,
     actions,
@@ -63,13 +58,14 @@ export function api<Ctx extends ApiCtx = ApiCtx, S extends AnyState = AnyState>(
  * which is where we store JSON data from the {@link mdw.fetch} middleware.
  */
 export function cache<Ctx extends ApiCtx = ApiCtx>(schema: {
-  cache: TableOutput<any, AnyState>;
+  cache: TableOutput;
 }) {
   return function* cache(ctx: Ctx, next: Next) {
     ctx.cacheData = yield* select(schema.cache.selectById, { id: ctx.key });
     yield* next();
     if (!ctx.cache) return;
-    let data;
+    // biome-ignore lint/suspicious/noExplicitAny: generically add the return to cache
+    let data: any;
     if (ctx.json.ok) {
       data = ctx.json.value;
     } else {
@@ -83,9 +79,7 @@ export function cache<Ctx extends ApiCtx = ApiCtx>(schema: {
 /**
  * This middleware will track the status of a middleware fn
  */
-export function loader<M extends AnyState = AnyState>(schema: {
-  loaders: LoaderOutput<M, AnyState>;
-}) {
+export function loader(schema: { loaders: LoaderOutput }) {
   return function* <Ctx extends ThunkCtxWLoader = ThunkCtxWLoader>(
     ctx: Ctx,
     next: Next,
@@ -95,7 +89,7 @@ export function loader<M extends AnyState = AnyState>(schema: {
       schema.loaders.start({ id: ctx.key }),
     ]);
 
-    if (!ctx.loader) ctx.loader = {} as any;
+    if (!ctx.loader) ctx.loader = {};
 
     try {
       yield* next();
@@ -127,8 +121,9 @@ export function loader<M extends AnyState = AnyState>(schema: {
         }),
       ]);
     } finally {
-      const loaders = yield* select((s: any) =>
-        schema.loaders.selectByIds(s, { ids: [ctx.name, ctx.key] }),
+      const loaders = yield* select(
+        (s: Parameters<typeof schema.loaders.selectByIds>[0]) =>
+          schema.loaders.selectByIds(s, { ids: [ctx.name, ctx.key] }),
       );
       const ids = loaders
         .filter((loader) => loader.status === "loading")
@@ -150,17 +145,17 @@ function defaultErrorFn<Ctx extends ApiCtx = ApiCtx>(ctx: Ctx) {
 /**
  * This middleware will track the status of a fetch request.
  */
-export function loaderApi<
-  Ctx extends ApiCtx = ApiCtx,
-  S extends AnyState = AnyState,
->({ schema, errorFn = defaultErrorFn }: ApiMdwProps<Ctx, S>) {
+export function loaderApi<Ctx extends ApiCtx = ApiCtx>({
+  schema,
+  errorFn = defaultErrorFn,
+}: ApiMdwProps<Ctx>) {
   return function* trackLoading(ctx: Ctx, next: Next) {
     try {
       yield* updateStore([
         schema.loaders.start({ id: ctx.name }),
         schema.loaders.start({ id: ctx.key }),
       ]);
-      if (!ctx.loader) ctx.loader = {} as any;
+      if (!ctx.loader) ctx.loader = {};
 
       yield* next();
 
@@ -208,8 +203,9 @@ export function loaderApi<
         }),
       ]);
     } finally {
-      const loaders = yield* select((s: any) =>
-        schema.loaders.selectByIds(s, { ids: [ctx.name, ctx.key] }),
+      const loaders = yield* select(
+        (s: Parameters<typeof schema.loaders.selectByIds>[0]) =>
+          schema.loaders.selectByIds(s, { ids: [ctx.name, ctx.key] }),
       );
       const ids = loaders
         .filter((loader) => loader.status === "loading")

@@ -24,14 +24,14 @@ export function createYjsSchema<
   root.set("data", data);
   data.set("items", new Y.Array());
 
-  return createSchemaWithUpdater<O, S>(slices, {
+  return createSchemaWithUpdater(slices, {
     createUpdateMdw: (store: FxStore<S>) => {
       // Set up observer to sync Y.Doc changes to store
       root.observeDeep(
         (events: Y.YEvent<any>[], transaction: Y.Transaction) => {
           console.log("Y.Doc changed", { events, transaction });
           store.setState(root.toJSON() as S);
-        }
+        },
       );
 
       // Initialize store with current Y.Doc state

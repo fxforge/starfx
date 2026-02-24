@@ -124,7 +124,7 @@ export function* waitFor(predicate: () => Operation<boolean>): Operation<void> {
 }
 
 export function getIdFromAction(
-  action: ActionWithPayload<{ key: string }> | ActionFnWithPayload,
+  action: ActionWithPayload<{ key: string }> | ActionFnWithPayload<unknown>,
 ): string {
   return typeof action === "function" ? action.toString() : action.payload.key;
 }

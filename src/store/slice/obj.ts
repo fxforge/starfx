@@ -1,44 +1,61 @@
-import type { AnyState } from "../../types.js";
-import type { BaseSchema } from "../types.js";
+import type { Draft, Immutable } from "immer";
+import type { BaseSchema, SliceState } from "../types.js";
 
-export interface ObjOutput<V extends AnyState, S extends AnyState>
-  extends BaseSchema<V> {
-  schema: "obj";
-  initialState: V;
-  set: (v: V) => (s: S) => void;
-  reset: () => (s: S) => void;
-  update: <P extends keyof V>(prop: { key: P; value: V[P] }) => (s: S) => void;
-  select: (s: S) => V;
+// biome-ignore lint/suspicious/noExplicitAny: this data could be shape as defined by the user and doesn't necessarily match between items (so no generic can be used)
+type ObjBase = Record<string, any>;
+
+export interface ObjActions<V extends ObjBase> {
+  set: (v: V) => (s: Draft<SliceState<V>>) => void;
+  reset: () => (s: Draft<SliceState<V>>) => void;
+  update: <P extends keyof V>(prop: {
+    key: P;
+    value: V[P];
+  }) => (s: Draft<SliceState<V>>) => void;
 }
 
-export function createObj<V extends AnyState, S extends AnyState = AnyState>({
+export interface ObjSelectors<V extends ObjBase> {
+  select: (s: SliceState<V>) => Immutable<V>;
+}
+
+export interface ObjOutput<V extends ObjBase>
+  extends BaseSchema<V>,
+    ObjActions<V>,
+    ObjSelectors<V> {
+  schema: "obj";
+  initialState: V;
+}
+
+export function createObj<V extends ObjBase>({
   name,
   initialState,
 }: {
-  name: keyof S;
+  name: keyof SliceState<V>;
   initialState: V;
-}): ObjOutput<V, S> {
+}): ObjOutput<V> {
+  const objInitialState: V = initialState ?? ({} as V);
+
   return {
     schema: "obj",
-    name: name as string,
-    initialState,
+    name: String(name),
+    initialState: objInitialState,
     set: (value) => (state) => {
-      (state as any)[name] = value;
+      Object.assign(state, { [name]: value });
     },
     reset: () => (state) => {
-      (state as any)[name] = initialState;
+      Object.assign(state, { [name]: initialState });
     },
-    update:
-      <P extends keyof V>(prop: { key: P; value: V[P] }) =>
-      (state) => {
-        (state as any)[name][prop.key] = prop.value;
-      },
-    select: (state) => {
-      return (state as any)[name];
+    update: (prop) => (state) => {
+      const target = state[name];
+      if (target && typeof target === "object") {
+        Object.assign(target, { [prop.key]: prop.value });
+      } else {
+        Object.assign(state, { [name]: { [prop.key]: prop.value } });
+      }
     },
-  };
+    select: (state) => state[name],
+  } satisfies ObjOutput<V>;
 }
 
-export function obj<V extends AnyState>(initialState: V) {
-  return (name: string) => createObj<V, AnyState>({ name, initialState });
+export function obj<V extends ObjBase>(initialState: V) {
+  return (name: string) => createObj<V>({ name, initialState });
 }

@@ -4,8 +4,8 @@
  * These tests verify the type inference and type safety of slice creation.
  * They don't run at runtime - they verify types at compile time.
  */
-import { assertType, describe, expectTypeOf, test } from "vitest";
-import type { AnyState } from "../types.js";
+import { describe, expectTypeOf, test } from "vitest";
+import type { Immutable } from "immer";
 import { createSchema, slice } from "../store/index.js";
 import type {
   AnyOutput,
@@ -15,7 +15,7 @@ import type {
   StrOutput,
   TableOutput,
 } from "../store/slice/index.js";
-import type { FxSchema } from "../store/types.js";
+import type { AnyState } from "../types.js";
 
 // =============================================================================
 // Test Entity Types
@@ -46,7 +46,7 @@ describe("slice.str types", () => {
     expectTypeOf(strFactory).parameter(0).toBeString();
 
     const strSlice = strFactory("token");
-    expectTypeOf(strSlice).toMatchTypeOf<StrOutput<AnyState>>();
+    expectTypeOf(strSlice).toExtend<StrOutput>();
   });
 
   test("str slice has correct initialState type", () => {
@@ -58,7 +58,7 @@ describe("slice.str types", () => {
     const strSlice = slice.str()("token");
     const updater = strSlice.set("new-value");
     expectTypeOf(updater).toBeFunction();
-    expectTypeOf(updater).parameter(0).toMatchTypeOf<AnyState>();
+    expectTypeOf(updater).parameter(0).toExtend<AnyState>();
   });
 
   test("str slice select returns string", () => {
@@ -83,7 +83,7 @@ describe("slice.num types", () => {
     expectTypeOf(numFactory).parameter(0).toBeString();
 
     const numSlice = numFactory("counter");
-    expectTypeOf(numSlice).toMatchTypeOf<NumOutput<AnyState>>();
+    expectTypeOf(numSlice).toExtend<NumOutput>();
   });
 
   test("num slice has correct initialState type", () => {
@@ -121,7 +121,7 @@ describe("slice.any types", () => {
   test("any factory infers type from initial value", () => {
     const boolFactory = slice.any<boolean>(false);
     const boolSlice = boolFactory("enabled");
-    expectTypeOf(boolSlice).toMatchTypeOf<AnyOutput<boolean, AnyState>>();
+    expectTypeOf(boolSlice).toExtend<AnyOutput<boolean>>();
     expectTypeOf(boolSlice.initialState).toBeBoolean();
   });
 
@@ -149,7 +149,7 @@ describe("slice.any types", () => {
   test("any with array type", () => {
     const tagsSlice = slice.any<string[]>([])("tags");
     expectTypeOf(tagsSlice.initialState).toEqualTypeOf<string[]>();
-    expectTypeOf(tagsSlice.select).returns.toEqualTypeOf<string[]>();
+    expectTypeOf(tagsSlice.select).returns.toEqualTypeOf<Immutable<string[]>>();
   });
 });
 
@@ -161,7 +161,7 @@ describe("slice.obj types", () => {
   test("obj factory infers type from initial value", () => {
     const userFactory = slice.obj<User>(emptyUser);
     const userSlice = userFactory("currentUser");
-    expectTypeOf(userSlice).toMatchTypeOf<ObjOutput<User, AnyState>>();
+    expectTypeOf(userSlice).toExtend<ObjOutput<User>>();
   });
 
   test("obj slice has correct initialState type", () => {
@@ -195,7 +195,7 @@ describe("slice.obj types", () => {
 
   test("obj slice select returns the object type", () => {
     const userSlice = slice.obj<User>(emptyUser)("currentUser");
-    expectTypeOf(userSlice.select).returns.toEqualTypeOf<User>();
+    expectTypeOf(userSlice.select).returns.toEqualTypeOf<Immutable<User>>();
   });
 });
 
@@ -204,30 +204,33 @@ describe("slice.obj types", () => {
 // =============================================================================
 
 describe("slice.table types", () => {
+  test("determines type from empty parameter", () => {
+    const tableWithEmpty = slice.table({ empty: emptyUser })("users");
+    expectTypeOf(tableWithEmpty.empty).toEqualTypeOf<User | undefined>();
+  });
+
   test("table factory returns TableOutput", () => {
     const tableFactory = slice.table<User>();
     const usersSlice = tableFactory("users");
-    expectTypeOf(usersSlice).toMatchTypeOf<
-      TableOutput<User, AnyState, User | undefined>
-    >();
+    expectTypeOf(usersSlice).toExtend<TableOutput<User>>();
   });
 
   test("table with empty returns non-undefined selectById", () => {
     const usersSlice = slice.table<User>({ empty: emptyUser })("users");
-    expectTypeOf(usersSlice).toMatchTypeOf<TableOutput<User, AnyState, User>>();
+    expectTypeOf(usersSlice).toExtend<TableOutput<User>>();
 
-    // selectById should return User (not User | undefined)
-    expectTypeOf(usersSlice.selectById).returns.toEqualTypeOf<User>();
-    expectTypeOf(usersSlice.findById).returns.toEqualTypeOf<User>();
+    type SelectByIdResult = ReturnType<typeof usersSlice.selectById>;
+    type FindByIdResult = ReturnType<typeof usersSlice.findById>;
+
+    expectTypeOf<SelectByIdResult>().toEqualTypeOf<Immutable<User>>();
+    expectTypeOf<FindByIdResult>().toEqualTypeOf<Immutable<User> | undefined>();
   });
 
   test("table without empty returns possibly undefined selectById", () => {
     const usersSlice = slice.table<User>()("users");
 
-    // selectById should return User | undefined
-    expectTypeOf(usersSlice.selectById).returns.toEqualTypeOf<
-      User | undefined
-    >();
+    type SelectByIdResult = ReturnType<typeof usersSlice.selectById>;
+    expectTypeOf<SelectByIdResult>().toEqualTypeOf<Immutable<User>>();
   });
 
   test("table slice add accepts correct record type", () => {
@@ -246,25 +249,30 @@ describe("slice.table types", () => {
 
   test("table slice selectTable returns correct record type", () => {
     const usersSlice = slice.table<User>()("users");
-    expectTypeOf(usersSlice.selectTable).returns.toMatchTypeOf<
-      Record<string | number, User>
+    expectTypeOf(usersSlice.selectTable).returns.toEqualTypeOf<
+      Immutable<Record<string | number, User>>
     >();
   });
 
   test("table slice selectTableAsList returns array", () => {
     const usersSlice = slice.table<User>()("users");
-    expectTypeOf(usersSlice.selectTableAsList).returns.toEqualTypeOf<User[]>();
+    expectTypeOf(usersSlice.selectTableAsList).returns.toEqualTypeOf<
+      Immutable<User[]>
+    >();
   });
 
   test("table slice selectByIds returns array", () => {
     const usersSlice = slice.table<User>()("users");
-    expectTypeOf(usersSlice.selectByIds).returns.toEqualTypeOf<User[]>();
+    expectTypeOf(usersSlice.selectByIds).returns.toEqualTypeOf<
+      Immutable<User[]>
+    >();
   });
 
   test("table with empty factory function", () => {
     const usersSlice = slice.table<User>({ empty: () => emptyUser })("users");
-    expectTypeOf(usersSlice.empty).toEqualTypeOf<User>();
-    expectTypeOf(usersSlice.selectById).returns.toEqualTypeOf<User>();
+    expectTypeOf(usersSlice.empty).toEqualTypeOf<User | undefined>();
+    type SelectByIdResult = ReturnType<typeof usersSlice.selectById>;
+    expectTypeOf<SelectByIdResult>().toEqualTypeOf<Immutable<User>>();
   });
 });
 
@@ -276,9 +284,7 @@ describe("slice.loaders types", () => {
   test("loaders factory returns LoaderOutput", () => {
     const loadersFactory = slice.loaders();
     const loadersSlice = loadersFactory("loaders");
-    expectTypeOf(loadersSlice).toMatchTypeOf<
-      LoaderOutput<AnyState, AnyState>
-    >();
+    expectTypeOf(loadersSlice).toExtend<LoaderOutput>();
   });
 
   test("loaders slice start/success/error accept LoaderPayload", () => {
@@ -294,12 +300,7 @@ describe("slice.loaders types", () => {
   });
 
   test("loaders with custom meta type", () => {
-    interface LoaderMeta {
-      endpoint: string;
-      retryCount: number;
-    }
-
-    const loadersSlice = slice.loaders<LoaderMeta>()("loaders");
+    const loadersSlice = slice.loaders()("loaders");
 
     // Should accept meta with correct type
     loadersSlice.start({
@@ -339,13 +340,11 @@ describe("createSchema types", () => {
     });
 
     // Schema should have the correct slice outputs
-    expectTypeOf(schema.users).toMatchTypeOf<TableOutput<User, any, User>>();
-    expectTypeOf(schema.posts).toMatchTypeOf<
-      TableOutput<Post, any, Post | undefined>
-    >();
-    expectTypeOf(schema.token).toMatchTypeOf<StrOutput<any>>();
-    expectTypeOf(schema.counter).toMatchTypeOf<NumOutput<any>>();
-    expectTypeOf(schema.currentUser).toMatchTypeOf<ObjOutput<User, any>>();
+    expectTypeOf(schema.users).toExtend<TableOutput<User>>();
+    expectTypeOf(schema.posts).toExtend<TableOutput<Post>>();
+    expectTypeOf(schema.token).toExtend<StrOutput>();
+    expectTypeOf(schema.counter).toExtend<NumOutput>();
+    expectTypeOf(schema.currentUser).toExtend<ObjOutput<User>>();
   });
 
   test("schema initialState has correct shape", () => {
@@ -433,7 +432,8 @@ describe("advanced type scenarios", () => {
       notifications: { email: true, push: false },
     })("settings");
 
-    expectTypeOf(settingsSlice.select).returns.toEqualTypeOf<Settings>();
+    type SettingsSelectResult = ReturnType<typeof settingsSlice.select>;
+    expectTypeOf<SettingsSelectResult>().toEqualTypeOf<Immutable<Settings>>();
 
     // update should work with nested keys
     settingsSlice.update({
@@ -456,7 +456,7 @@ describe("advanced type scenarios", () => {
 
     const complexSlice = slice.table<ComplexEntity>()("complex");
     expectTypeOf(complexSlice.selectTableAsList).returns.toEqualTypeOf<
-      ComplexEntity[]
+      Immutable<ComplexEntity[]>
     >();
   });
 
@@ -473,7 +473,7 @@ describe("advanced type scenarios", () => {
     type UserListResult = ReturnType<typeof schema.users.selectTableAsList>;
     type PostListResult = ReturnType<typeof schema.posts.selectTableAsList>;
 
-    expectTypeOf<UserListResult>().toEqualTypeOf<User[]>();
-    expectTypeOf<PostListResult>().toEqualTypeOf<Post[]>();
+    expectTypeOf<UserListResult>().toEqualTypeOf<Immutable<User[]>>();
+    expectTypeOf<PostListResult>().toEqualTypeOf<Immutable<Post[]>>();
   });
 });

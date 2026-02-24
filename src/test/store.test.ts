@@ -56,7 +56,8 @@ const updateUser =
     const users = findUsers(state);
     users[id].name = name;
 
-    (users as any)[2] = undefined;
+    // biome-ignore lint/suspicious/noExplicitAny: test-only
+    (users[2] as any) = undefined;
     users[3] = { id: "", name: "" };
 
     // or mutate state directly without selectors
@@ -64,7 +65,7 @@ const updateUser =
   };
 
 const testSchema = (initialState: Partial<State> = {}) => {
-  return createSchema<State, FxMap>({
+  return createSchema({
     users: slice.table<User>({ initialState: initialState.users ?? {} }),
     theme: slice.str(initialState.theme ?? ""),
     token: slice.str(initialState.token ?? ""),
@@ -79,7 +80,8 @@ test("update store and receives update from channel `StoreUpdateContext`", async
     users: { 1: { id: "1", name: "testing" }, 2: { id: "2", name: "wow" } },
   });
   const testStore = createStore({ scope, schemas: [schema] });
-  let store;
+  // biome-ignore lint/suspicious/noExplicitAny: test-only
+  let store: any;
   await scope.run(function* (): Operation<Result<void>[]> {
     const result = yield* parallel([
       function* () {
@@ -96,7 +98,7 @@ test("update store and receives update from channel `StoreUpdateContext`", async
     ]);
     return yield* result;
   });
-  expect((store as any)?.getState()).toEqual({
+  expect(store?.getState()).toEqual({
     users: { 1: { id: "1", name: "eric" }, 3: { id: "", name: "" } },
     dev: true,
     theme: "",

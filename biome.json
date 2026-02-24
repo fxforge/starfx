@@ -13,8 +13,8 @@
     "rules": {
       "recommended": true,
       "suspicious": {
-        "noExplicitAny": "off",
-        "noImplicitAnyLet": "off",
+        "noExplicitAny": "warn",
+        "noImplicitAnyLet": "warn",
         "noConfusingVoidType": "off"
       },
       "correctness": {

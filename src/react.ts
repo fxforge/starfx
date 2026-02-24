@@ -15,7 +15,7 @@ import {
 import type { LoaderOutput } from "./store/slice/loaders.js";
 import type { TableOutput } from "./store/slice/table.js";
 import type { FxMap } from "./store/types.js";
-import type { AnyState, LoaderState } from "./types.js";
+import type { LoaderState } from "./types.js";
 import type { ActionFn, ActionFnWithPayload } from "./types.js";
 
 export { useDispatch, useSelector } from "react-redux";
@@ -28,6 +28,9 @@ const {
   createContext,
   createElement: h,
 } = React;
+
+type WithLoadersMap = FxMap & { loaders: (n: string) => LoaderOutput };
+type WithCacheMap = FxMap & { cache: (n: string) => TableOutput<any> };
 
 export interface UseApiProps<P = any> extends LoaderState {
   trigger: (p: P) => void;
@@ -47,79 +50,66 @@ export type UseApiResult<P, A extends ThunkAction = ThunkAction> =
   | UseApiSimpleProps
   | UseApiAction<A>;
 
-export interface UseCacheResult<D = any, A extends ThunkAction = ThunkAction>
+export interface UseCacheResult<D, A extends ThunkAction = ThunkAction>
   extends UseApiAction<A> {
   data: D | null;
 }
 
-const SchemaContext = createContext<FxSchema<AnyState, FxMap> | null>(null);
+const SchemaContext = createContext<FxSchema<FxMap> | null>(null);
 
 // Strongly-typed overload that ties `store` and `schema` to the same state type S
-export function Provider<S extends AnyState>(props: {
-  store: FxStore<S>;
-  schema?: FxSchema<S, any>;
+export function Provider<O extends FxMap>(props: {
+  store: FxStore<O>;
+  schema?: FxSchema<O>;
   children?: React.ReactNode;
 }): React.ReactElement;
 
 // Provider overload accepting any store and schema to avoid variance issues
 export function Provider(props: {
-  store: FxStore<any>;
-  schema?: FxSchema<any, any>;
+  store: FxStore<FxMap>;
+  schema?: FxSchema<FxMap>;
   children?: React.ReactNode;
 }): React.ReactElement;
 
 // Runtime implementation uses `AnyState` for minimal widening
 export function Provider(props: {
-  store: FxStore<AnyState>;
-  schema?: FxSchema<AnyState, any>;
+  store: FxStore<FxMap>;
+  schema?: FxSchema<FxMap>;
   children?: React.ReactNode;
 }) {
   const { store, schema, children } = props;
   // Use provided schema or pull from store
-  const schemaValue = (schema ?? store.schema) as FxSchema<AnyState, any>;
+  const schemaValue = (schema ?? store.schema) as FxSchema<FxMap>;
   const inner = h(SchemaContext.Provider, { value: schemaValue }, children);
   return h(ReduxProvider, { store, children: inner });
 }
 
-export function useSchema<S extends AnyState>() {
+export function useSchema<O extends FxMap>() {
   const ctx = useContext(SchemaContext);
   if (!ctx) throw new Error("No Schema available in context");
-  return ctx as FxSchema<S>;
+  return ctx as FxSchema<O>;
 }
 
 // Typed variant for schemas that include `loaders`.
-export function useSchemaWithLoaders(): FxSchema<
-  AnyState,
-  { loaders: (n: string) => LoaderOutput<any, any> }
->;
-export function useSchemaWithLoaders<
-  S extends { loaders: LoaderOutput<any, any>["initialState"] },
->(): FxSchema<S, { loaders: (n: string) => LoaderOutput<any, any> }>;
+export function useSchemaWithLoaders(): FxSchema<WithLoadersMap>;
+export function useSchemaWithLoaders<O extends WithLoadersMap>(): FxSchema<O>;
 export function useSchemaWithLoaders() {
   const ctx = useContext(SchemaContext);
   if (!ctx) throw new Error("No Schema available in context");
-  return ctx as FxSchema<
-    any,
-    { loaders: (n: string) => LoaderOutput<any, any> }
-  >;
+  return ctx as FxSchema<WithLoadersMap>;
 }
 
 // Typed variant for schemas that include `cache`.
-export function useSchemaWithCache(): FxSchema<
-  AnyState,
-  { cache: (n: string) => TableOutput<any, any> }
->;
-export function useSchemaWithCache<
-  S extends { cache: TableOutput<any, any>["initialState"] },
->(): FxSchema<S, { cache: (n: string) => TableOutput<any, any> }>;
+export function useSchemaWithCache(): FxSchema<WithCacheMap>;
+export function useSchemaWithCache<O extends WithCacheMap>(): FxSchema<O>;
 export function useSchemaWithCache() {
   const ctx = useContext(SchemaContext);
   if (!ctx) throw new Error("No Schema available in context");
-  return ctx as FxSchema<any, { cache: (n: string) => TableOutput<any, any> }>;
+  return ctx as FxSchema<WithCacheMap>;
 }
 
-export function useStore<S extends AnyState>() {
-  return useReduxStore() as FxStore<S>;
+export function useStore<O extends FxMap>() {
+  return useReduxStore() as FxStore<O>;
 }
 
 /**
@@ -146,12 +136,11 @@ export function useStore<S extends AnyState>() {
  * ```
  */
 export function useLoader(
-  action: ThunkAction | ActionFnWithPayload,
-): LoaderState<any>;
-export function useLoader<
-  S extends { loaders: LoaderOutput<any, any>["initialState"] },
-  M extends AnyState = any,
->(action: ThunkAction | ActionFnWithPayload): LoaderState<M>;
+  action: ThunkAction | ActionFnWithPayload<any>,
+): LoaderState;
+export function useLoader<O extends WithLoadersMap>(
+  action: ThunkAction | ActionFnWithPayload<any>,
+): LoaderState;
 export function useLoader(action: any) {
   const schema = useSchemaWithLoaders();
   const id = getIdFromAction(action);
@@ -256,7 +245,7 @@ export function useQuery<P = any, A extends ThunkAction = ThunkAction<P>>(
  */
 export function useCache(action: ThunkAction): UseCacheResult<any, ThunkAction>;
 export function useCache<
-  S extends { cache: TableOutput<any, any>["initialState"] },
+  S extends { cache: TableOutput<any>["initialState"] },
   P = any,
   ApiSuccess = any,
 >(

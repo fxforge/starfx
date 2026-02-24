@@ -1,11 +1,11 @@
+import type { Draft, Immutable } from "immer";
 import { createSelector } from "reselect";
 import type {
-  AnyState,
   LoaderItemState,
   LoaderPayload,
   LoaderState,
 } from "../../types.js";
-import type { BaseSchema } from "../types.js";
+import type { BaseSchema, SliceState } from "../types.js";
 
 interface PropId {
   id: string;
@@ -17,23 +17,21 @@ interface PropIds {
 
 const excludesFalse = <T>(n?: T): n is T => Boolean(n);
 
-export function defaultLoaderItem<M extends AnyState = AnyState>(
-  li: Partial<LoaderItemState<M>> = {},
-): LoaderItemState<M> {
+export function defaultLoaderItem(
+  li: Partial<LoaderItemState> = {},
+): LoaderItemState {
   return {
     id: "",
     status: "idle",
     message: "",
     lastRun: 0,
     lastSuccess: 0,
-    meta: {} as M,
+    meta: {},
     ...li,
   };
 }
 
-export function defaultLoader<M extends AnyState = AnyState>(
-  l: Partial<LoaderItemState<M>> = {},
-): LoaderState<M> {
+export function defaultLoader(l: Partial<LoaderItemState> = {}): LoaderState {
   const loading = defaultLoaderItem(l);
   return {
     ...loading,
@@ -46,100 +44,87 @@ export function defaultLoader<M extends AnyState = AnyState>(
       loading.lastSuccess === 0,
   };
 }
+type LoaderTable = Record<string, LoaderItemState>;
 
-interface LoaderSelectors<
-  M extends AnyState = AnyState,
-  S extends AnyState = AnyState,
-> {
-  findById: (
-    d: Record<string, LoaderItemState<M>>,
-    { id }: PropId,
-  ) => LoaderState<M>;
-  findByIds: (
-    d: Record<string, LoaderItemState<M>>,
-    { ids }: PropIds,
-  ) => LoaderState<M>[];
-  selectTable: (s: S) => Record<string, LoaderItemState<M>>;
-  selectTableAsList: (state: S) => LoaderItemState<M>[];
-  selectById: (s: S, p: PropId) => LoaderState<M>;
-  selectByIds: (s: S, p: PropIds) => LoaderState<M>[];
+export interface LoaderSelectors {
+  findById: (d: Immutable<LoaderTable>, p: PropId) => LoaderState;
+  findByIds: (d: Immutable<LoaderTable>, p: PropIds) => LoaderState[];
+  selectTable: (
+    s: Immutable<SliceState<LoaderTable>>,
+  ) => Immutable<LoaderTable>;
+  selectTableAsList: (
+    state: Immutable<SliceState<LoaderTable>>,
+  ) => LoaderItemState[];
+  selectById: (s: Immutable<SliceState<LoaderTable>>, p: PropId) => LoaderState;
+  selectByIds: (
+    s: Immutable<SliceState<LoaderTable>>,
+    p: PropIds,
+  ) => LoaderState[];
 }
 
-function loaderSelectors<
-  M extends AnyState = AnyState,
-  S extends AnyState = AnyState,
->(
-  selectTable: (s: S) => Record<string, LoaderItemState<M>>,
-): LoaderSelectors<M, S> {
-  const empty = defaultLoader();
-  const tableAsList = (
-    data: Record<string, LoaderItemState<M>>,
-  ): LoaderItemState<M>[] => Object.values(data).filter(excludesFalse);
+function loaderSelectors(selectTable: LoaderSelectors["selectTable"]) {
+  const findById = ((data, { id }) =>
+    defaultLoader(data[id])) satisfies LoaderSelectors["findById"];
 
-  const findById = (data: Record<string, LoaderItemState<M>>, { id }: PropId) =>
-    defaultLoader<M>(data[id]) || empty;
-  const findByIds = (
-    data: Record<string, LoaderItemState<M>>,
-    { ids }: PropIds,
-  ): LoaderState<M>[] =>
-    ids.map((id) => defaultLoader<M>(data[id])).filter(excludesFalse);
-  const selectById = createSelector(
-    selectTable,
-    (_: S, p: PropId) => p.id,
-    (loaders, id): LoaderState<M> => findById(loaders, { id }),
-  );
+  const findByIds = ((data, { ids }) =>
+    ids
+      .map((id) => defaultLoader(data[id]))
+      .filter(excludesFalse)) satisfies LoaderSelectors["findByIds"];
 
-  return {
+  const selectors = {
     findById,
     findByIds,
     selectTable,
-    selectTableAsList: createSelector(
-      selectTable,
-      (data): LoaderItemState<M>[] => tableAsList(data),
+    selectTableAsList: createSelector([selectTable], (data) =>
+      Object.values(data).filter(excludesFalse),
     ),
-    selectById,
+    selectById: createSelector(
+      [selectTable, (_, p: PropId) => p.id],
+      (data, id) => findById(data, { id }),
+    ),
     selectByIds: createSelector(
-      selectTable,
-      (_: S, p: PropIds) => p.ids,
-      (loaders, ids) => findByIds(loaders, { ids }),
+      [selectTable, (_, p: PropIds) => p.ids],
+      (data, ids) => findByIds(data, { ids }),
     ),
-  };
+  } satisfies LoaderSelectors;
+
+  return selectors;
 }
 
-export interface LoaderOutput<
-  M extends Record<string, unknown>,
-  S extends AnyState,
-> extends LoaderSelectors<M, S>,
-    BaseSchema<Record<string, LoaderItemState<M>>> {
+export interface LoaderActions {
+  start: (e: LoaderPayload) => (s: Draft<SliceState<LoaderTable>>) => void;
+  success: (e: LoaderPayload) => (s: Draft<SliceState<LoaderTable>>) => void;
+  error: (e: LoaderPayload) => (s: Draft<SliceState<LoaderTable>>) => void;
+  reset: () => (s: Draft<SliceState<LoaderTable>>) => void;
+  resetByIds: (ids: string[]) => (s: Draft<SliceState<LoaderTable>>) => void;
+}
+
+export interface LoaderOutput
+  extends BaseSchema<LoaderTable>,
+    LoaderActions,
+    LoaderSelectors {
   schema: "loader";
-  initialState: Record<string, LoaderItemState<M>>;
-  start: (e: LoaderPayload<M>) => (s: S) => void;
-  success: (e: LoaderPayload<M>) => (s: S) => void;
-  error: (e: LoaderPayload<M>) => (s: S) => void;
-  reset: () => (s: S) => void;
-  resetByIds: (ids: string[]) => (s: S) => void;
+  initialState: LoaderTable;
 }
 
 const ts = () => new Date().getTime();
 
-export const createLoaders = <
-  M extends AnyState = AnyState,
-  S extends AnyState = AnyState,
->({
+export const createLoaders = ({
   name,
   initialState = {},
 }: {
-  name: keyof S;
-  initialState?: Record<string, LoaderItemState<M>>;
-}): LoaderOutput<M, S> => {
-  const selectors = loaderSelectors<M, S>((s: S) => s[name]);
+  name: keyof SliceState<LoaderTable>;
+  initialState?: LoaderTable;
+}): LoaderOutput => {
+  const loaderInitialState = initialState ?? {};
+  const selectors = loaderSelectors((s) => s[name]);
 
-  return {
+  const output = {
     schema: "loader",
-    name: name as string,
-    initialState,
+    name,
+    initialState: loaderInitialState,
     start: (e) => (s) => {
-      const table = selectors.selectTable(s);
+      const table = s[name];
       const loader = table[e.id];
       table[e.id] = defaultLoaderItem({
         ...loader,
@@ -149,7 +134,7 @@ export const createLoaders = <
       });
     },
     success: (e) => (s) => {
-      const table = selectors.selectTable(s);
+      const table = s[name];
       const loader = table[e.id];
       table[e.id] = defaultLoaderItem({
         ...loader,
@@ -159,7 +144,7 @@ export const createLoaders = <
       });
     },
     error: (e) => (s) => {
-      const table = selectors.selectTable(s);
+      const table = s[name];
       const loader = table[e.id];
       table[e.id] = defaultLoaderItem({
         ...loader,
@@ -168,20 +153,22 @@ export const createLoaders = <
       });
     },
     reset: () => (s) => {
-      (s as any)[name] = initialState;
+      const table = s[name];
+      for (const key of Object.keys(table)) delete table[key];
+      Object.assign(table, loaderInitialState);
     },
     resetByIds: (ids: string[]) => (s) => {
-      const table = selectors.selectTable(s);
+      const table = s[name];
       ids.forEach((id) => {
         delete table[id];
       });
     },
     ...selectors,
-  };
+  } satisfies LoaderOutput;
+
+  return output;
 };
 
-export function loaders<M extends AnyState = AnyState>(
-  initialState?: Record<string, LoaderItemState<M>>,
-) {
-  return (name: string) => createLoaders<M>({ name, initialState });
+export function loaders(initialState?: Record<string, LoaderItemState>) {
+  return (name: string) => createLoaders({ name, initialState });
 }

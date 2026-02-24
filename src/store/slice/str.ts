@@ -1,38 +1,46 @@
-import type { AnyState } from "../../types.js";
-import type { BaseSchema } from "../types.js";
+import type { Draft, Immutable } from "immer";
+import type { BaseSchema, SliceState } from "../types.js";
 
-export interface StrOutput<S extends AnyState = AnyState>
-  extends BaseSchema<string> {
-  schema: "str";
-  initialState: string;
-  set: (v: string) => (s: S) => void;
-  reset: () => (s: S) => void;
-  select: (s: S) => string;
+type StrRootState = SliceState<string>;
+
+export interface StrActions {
+  set: (v: string) => (s: Draft<StrRootState>) => void;
+  reset: () => (s: Draft<StrRootState>) => void;
 }
 
-export function createStr<S extends AnyState = AnyState>({
+export interface StrSelectors {
+  select: (s: Immutable<StrRootState>) => string;
+}
+
+export interface StrOutput
+  extends BaseSchema<string>,
+    StrActions,
+    StrSelectors {
+  schema: "str";
+  initialState: string;
+}
+
+export function createStr({
   name,
   initialState = "",
 }: {
-  name: keyof S;
+  name: keyof StrRootState;
   initialState?: string;
-}): StrOutput<S> {
+}): StrOutput {
   return {
     schema: "str",
-    name: name as string,
+    name: String(name),
     initialState,
     set: (value) => (state) => {
-      (state as any)[name] = value;
+      state[name] = value;
     },
     reset: () => (state) => {
-      (state as any)[name] = initialState;
+      state[name] = initialState;
     },
-    select: (state) => {
-      return (state as any)[name];
-    },
-  };
+    select: (state) => state[name],
+  } satisfies StrOutput;
 }
 
 export function str(initialState?: string) {
-  return (name: string) => createStr<AnyState>({ name, initialState });
+  return (name: string) => createStr({ name, initialState });
 }

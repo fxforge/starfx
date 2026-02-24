@@ -28,7 +28,7 @@ test("sets up a table", async () => {
     schemas: [schema],
   });
 
-  await store.run(function* () {
+  await store.initialize(function* () {
     yield* updateStore(tableSlice.set({ [first.id]: first }));
   });
   expect(store.getState()[NAME]).toEqual({ [first.id]: first });
@@ -42,7 +42,7 @@ test("adds a row", async () => {
     schemas: [schema],
   });
 
-  await store.run(function* () {
+  await store.initialize(function* () {
     yield* updateStore(tableSlice.set({ [second.id]: second }));
   });
   expect(store.getState()[NAME]).toEqual({ 2: second });
@@ -57,13 +57,11 @@ test("removes a row", async () => {
   });
 
   // Pre-populate the store
-  await store.run(function* () {
+  await store.initialize(function* () {
     yield* updateStore(
       tableSlice.set({ [first.id]: first, [second.id]: second }),
     );
-  });
 
-  await store.run(function* () {
     yield* updateStore(tableSlice.remove(["1"]));
   });
   expect(store.getState()[NAME]).toEqual({ [second.id]: second });
@@ -76,8 +74,9 @@ test("updates a row", async () => {
   const store = createStore({
     schemas: [schema],
   });
-  await store.run(function* () {
+  await store.initialize(function* () {
     const updated = { id: second.id, user: "BB" };
+    yield* updateStore(tableSlice.set({ [second.id]: second }));
     yield* updateStore(tableSlice.patch({ [updated.id]: updated }));
   });
   expect(store.getState()[NAME]).toEqual({
@@ -92,7 +91,7 @@ test("gets a row", async () => {
   const store = createStore({
     schemas: [schema],
   });
-  await store.run(function* () {
+  await store.initialize(function* () {
     yield* updateStore(
       tableSlice.add({
         [first.id]: first,
@@ -126,7 +125,7 @@ test("gets all rows", async () => {
     schemas: [schema],
   });
   const data = { [first.id]: first, [second.id]: second, [third.id]: third };
-  await store.run(function* () {
+  await store.initialize(function* () {
     yield* updateStore(tableSlice.add(data));
   });
   expect(store.getState()[NAME]).toEqual(data);
@@ -143,7 +142,7 @@ test("with empty", async () => {
   });
 
   expect(tbl.empty).toEqual(first);
-  await store.run(function* () {
+  await store.initialize(function* () {
     yield* updateStore(tbl.set({ [first.id]: first }));
   });
   expect(tbl.selectTable(store.getState())).toEqual({
@@ -164,7 +163,7 @@ test("with no empty", async () => {
   });
 
   expect(tbl.empty).toEqual(undefined);
-  await store.run(function* () {
+  await store.initialize(function* () {
     yield* updateStore(tbl.set({ [first.id]: first }));
   });
   expect(tbl.selectTable(store.getState())).toEqual({

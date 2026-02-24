@@ -19,7 +19,7 @@ test("default schema", async () => {
     loaders: {},
   });
 
-  await store.run(function* () {
+  await store.initialize(function* () {
     yield* schema.update(schema.loaders.start({ id: "1" }));
     yield* schema.update(schema.cache.add({ "1": true }));
   });
@@ -61,7 +61,7 @@ test("general types and functionality", async () => {
   const userMap = db.users.selectTable(store.getState());
   expect(userMap).toEqual({ "1": { id: "1", name: "wow" } });
 
-  await store.run(function* () {
+  await store.initialize(function* () {
     yield* db.update([
       db.users.add({ "2": { id: "2", name: "bob" } }),
       db.users.patch({ "1": { name: "zzz" } }),
@@ -99,7 +99,7 @@ test("can work with a nested object", async () => {
     loaders: slice.loaders(),
   });
   const store = createStore({ schemas: [db] });
-  await store.run(function* () {
+  await store.initialize(function* () {
     yield* db.update(db.currentUser.update({ key: "name", value: "vvv" }));
     const curUser = yield* select(db.currentUser.select);
     expect(curUser).toEqual({ id: "", name: "vvv", roles: [] });

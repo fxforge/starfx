@@ -10,6 +10,7 @@
   "module": "./dist/esm/index.js",
   "scripts": {
     "test": "vitest --exclude examples",
+    "typecheck": "tsc --noEmit",
     "lint": "biome check --write",
     "fmt": "biome check --write --linter-enabled=false",
     "ci": "biome ci .",

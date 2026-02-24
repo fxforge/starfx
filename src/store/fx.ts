@@ -3,9 +3,14 @@ import { getIdFromAction, take } from "../action.js";
 import { parallel, safe } from "../fx/index.js";
 import type { ThunkAction } from "../query/index.js";
 import type { ActionFnWithPayload, AnyState, LoaderState } from "../types.js";
-import { StoreContext } from "./context.js";
+import { expectStore } from "./context.js";
 import type { LoaderOutput } from "./slice/loaders.js";
-import type { FxStore, StoreUpdater, UpdaterCtx } from "./types.js";
+import type {
+  FxMap,
+  SliceFromSchema,
+  StoreUpdater,
+  UpdaterCtx,
+} from "./types.js";
 
 /**
  * Updates the store using the default schema's update method.
@@ -14,31 +19,30 @@ import type { FxStore, StoreUpdater, UpdaterCtx } from "./types.js";
 export function* updateStore<S extends AnyState>(
   updater: StoreUpdater<S> | StoreUpdater<S>[],
 ): Operation<UpdaterCtx<S>> {
-  const store = yield* StoreContext.expect();
-  const st = store as FxStore<S>;
-  const ctx = yield* st.schema.update(updater);
-  return ctx;
+  const store = yield* expectStore<FxMap>();
+  const ctx = yield* store.schema.update(
+    updater as
+      | StoreUpdater<SliceFromSchema<FxMap>>
+      | StoreUpdater<SliceFromSchema<FxMap>>[],
+  );
+  return ctx as UpdaterCtx<S>;
 }
 
-export function select<S, R>(selectorFn: (s: S) => R): Operation<R>;
-export function select<S, R, P>(
-  selectorFn: (s: S, p: P) => R,
-  p: P,
-): Operation<R>;
-export function* select<S, R, P>(
-  selectorFn: (s: S, p?: P) => R,
-  p?: P,
+export function* select<S, Args extends unknown[], R>(
+  selectorFn: (s: S, ...args: Args) => R,
+  ...args: Args
 ): Operation<R> {
-  const store = yield* StoreContext.expect();
-  return selectorFn(store.getState() as S, p);
+  const store = yield* expectStore<FxMap>();
+  return selectorFn(store.getState() as S, ...args);
 }
 
-export function* waitForLoader<M extends AnyState>(
-  loaders: LoaderOutput<M, AnyState>,
-  action: ThunkAction | ActionFnWithPayload,
-): Operation<LoaderState<M>> {
+export function* waitForLoader(
+  loaders: LoaderOutput,
+  action: ThunkAction | ActionFnWithPayload<unknown>,
+): Operation<LoaderState> {
   const id = getIdFromAction(action);
-  const selector = (s: AnyState) => loaders.selectById(s, { id });
+  const selector = (s: Parameters<typeof loaders.selectById>[0]) =>
+    loaders.selectById(s, { id });
 
   // check for done state on init
   let loader = yield* select(selector);
@@ -55,18 +59,16 @@ export function* waitForLoader<M extends AnyState>(
   }
 }
 
-export function* waitForLoaders<M extends AnyState>(
-  loaders: LoaderOutput<M, AnyState>,
-  actions: (ThunkAction | ActionFnWithPayload)[],
-): Operation<Result<LoaderState<M>>[]> {
+export function* waitForLoaders(
+  loaders: LoaderOutput,
+  actions: (ThunkAction | ActionFnWithPayload<unknown>)[],
+): Operation<Result<LoaderState>[]> {
   const ops = actions.map((action) => () => waitForLoader(loaders, action));
-  const group = yield* parallel<LoaderState<M>>(ops);
+  const group = yield* parallel<LoaderState>(ops);
   return yield* group;
 }
 
-export function createTracker<T, M extends Record<string, unknown>>(
-  loader: LoaderOutput<M, AnyState>,
-) {
+export function createTracker<T>(loader: LoaderOutput) {
   return (id: string) => {
     return function* (
       op: () => Operation<Result<T>>,

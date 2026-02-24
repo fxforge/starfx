@@ -1,32 +1,20 @@
+import { lift } from "effection";
 import { type Draft, enablePatches, produceWithPatches } from "immer";
+import { API_ACTION_PREFIX, ActionContext, emit } from "../action.js";
 import { type BaseMiddleware, compose } from "../compose.js";
-import { type AnyState, type Next, StoreContext } from "../index.js";
+import { type AnyState, ListenersContext, type Next } from "../index.js";
+import { StoreUpdateContext, expectStore } from "./context.js";
 import { slice } from "./slice/index.js";
-import type { LoaderOutput } from "./slice/loaders.js";
-import type { TableOutput } from "./slice/table.js";
-import { StoreTailMdwContext } from "./store.js";
 import type {
-  BaseSchema,
+  FactoryInitial,
+  FactoryReturn,
   FxMap,
   FxSchema,
   FxStore,
+  SliceFromSchema,
   StoreUpdater,
   UpdaterCtx,
 } from "./types.js";
-
-// Default FxMap that includes the built-in `cache` and `loaders` slices
-type DefaultFxMap = FxMap & {
-  cache: (n: string) => TableOutput<any, AnyState>;
-  loaders: (n: string) => LoaderOutput<AnyState, AnyState>;
-};
-
-// Helper types to extract the factory return type and its initialState
-type FactoryReturn<T> = T extends (name: string) => infer R ? R : never;
-type FactoryInitial<T> = FactoryReturn<NonNullable<T>> extends BaseSchema<
-  infer IS
->
-  ? IS
-  : never;
 
 const defaultSchema = <O>(): O =>
   ({ cache: slice.table(), loaders: slice.loaders() }) as O;
@@ -68,7 +56,39 @@ export interface CreateSchemaWithUpdaterOptions<S extends AnyState> {
    * Factory function that creates the update middleware.
    * This is where you implement your state update logic (e.g., immer, plain objects, etc.)
    */
-  createUpdateMdw: (store: FxStore<S>) => BaseMiddleware<UpdaterCtx<S>>;
+  updateMdw: BaseMiddleware<UpdaterCtx<S>>;
+}
+
+function* logMdw<O extends FxMap>(
+  ctx: UpdaterCtx<SliceFromSchema<O>>,
+  next: Next,
+) {
+  const signal = yield* ActionContext.expect();
+  const action = {
+    type: `${API_ACTION_PREFIX}store`,
+    payload: ctx,
+  };
+
+  yield* lift(emit)({ signal, action });
+  yield* next();
+}
+
+function* notifyChannelMdw<O extends FxMap>(
+  _: UpdaterCtx<SliceFromSchema<O>>,
+  next: Next,
+) {
+  const chan = yield* StoreUpdateContext.expect();
+  yield* chan.send();
+  yield* next();
+}
+
+function* notifyListenersMdw<O extends FxMap>(
+  _: UpdaterCtx<SliceFromSchema<O>>,
+  next: Next,
+) {
+  const listeners = yield* ListenersContext.expect();
+  listeners.forEach((f) => f());
+  yield* next();
 }
 
 /**
@@ -92,45 +112,40 @@ export interface CreateSchemaWithUpdaterOptions<S extends AnyState> {
  * });
  * ```
  */
-export function createSchemaWithUpdater<
-  O extends FxMap,
-  S extends AnyState = { [key in keyof O]: FactoryInitial<O[key]> },
->(
+export function createSchemaWithUpdater<O extends FxMap>(
   slices: O,
   {
     name = "default",
     middleware = [],
-    createUpdateMdw,
-  }: CreateSchemaWithUpdaterOptions<S>,
-): FxSchema<S, O> {
+    updateMdw,
+  }: CreateSchemaWithUpdaterOptions<SliceFromSchema<O>>,
+): FxSchema<O> {
   const { db, initialState } = buildSlices(slices);
 
   // Precomputed middleware will be set on first update call
-  let composedMdw: ReturnType<typeof compose<UpdaterCtx<S>>> | null = null;
+  const composedMdw: ReturnType<
+    typeof compose<UpdaterCtx<SliceFromSchema<O>>>
+  > = compose<UpdaterCtx<SliceFromSchema<O>>>([
+    updateMdw,
+    ...middleware,
+    logMdw,
+    notifyChannelMdw,
+    notifyListenersMdw,
+  ]);
 
-  function* update(ups: StoreUpdater<S> | StoreUpdater<S>[]) {
-    const store = yield* StoreContext.expect();
-    const st = store as FxStore<S>;
-
-    // Lazily compose the full middleware stack on first call
-    // This allows the store tail middleware context to be set before we compose
-    if (!composedMdw) {
-      const storeTailMdw = yield* StoreTailMdwContext.expect();
-      const updateMdw = createUpdateMdw(st);
-
-      // Precompute full middleware: updateMdw -> user middleware -> store tail
-      // Cast the combined array to the explicit middleware type to appease TS
-      composedMdw = compose<UpdaterCtx<S>>([
-        updateMdw,
-        ...(middleware ?? []),
-        ...storeTailMdw,
-      ] as BaseMiddleware<UpdaterCtx<S>>[]);
-    }
-
-    const ctx: UpdaterCtx<S> = {
+  function* update(
+    ups: StoreUpdater<SliceFromSchema<O>> | StoreUpdater<SliceFromSchema<O>>[],
+  ) {
+    const ctx: UpdaterCtx<SliceFromSchema<O>> = {
       updater: ups,
       patches: [],
     };
+
+    if (!composedMdw) {
+      throw new Error(
+        "Schema update middleware not initialized. Ensure the store is properly initialized before dispatching updates.",
+      );
+    }
 
     yield* composedMdw(ctx);
 
@@ -139,37 +154,36 @@ export function createSchemaWithUpdater<
 
   function* reset(ignoreList: (string | number | symbol)[] = []) {
     return yield* update((s) => {
-      const state = s as Draft<S>;
-      const stateObj = state as unknown as { [K in keyof S]: S[K] };
-      const keep = { ...(initialState as S) } as S;
+      const state = s as Draft<SliceFromSchema<O>>;
+      const stateObj = state as unknown as {
+        [K in keyof SliceFromSchema<O>]: SliceFromSchema<O>[K];
+      };
+      const keep = {
+        ...(initialState as SliceFromSchema<O>),
+      } as SliceFromSchema<O>;
 
-      for (const key of ignoreList as Array<keyof S>) {
+      for (const key of ignoreList as Array<keyof SliceFromSchema<O>>) {
         keep[key] = stateObj[key];
       }
 
-      for (const key of Object.keys(stateObj) as Array<keyof S>) {
+      for (const key of Object.keys(stateObj) as Array<
+        keyof SliceFromSchema<O>
+      >) {
         stateObj[key] = keep[key];
       }
     });
   }
 
-  const schema = db as FxSchema<S, O>;
+  const schema = db as FxSchema<O>;
   schema.name = name;
   schema.update = update;
-  schema.initialState = initialState as S;
+  schema.initialState = initialState as SliceFromSchema<O>;
   schema.reset = reset;
 
   return schema;
 }
 
-/**
- * Creates a schema with immer-based state updates.
- * This is the default implementation that uses immer's produceWithPatches.
- */
-export function createSchema<
-  S extends AnyState,
-  O extends FxMap = DefaultFxMap,
->(
+export function createSchema<O extends FxMap>(
   slices?: O,
   options: {
     /**
@@ -177,31 +191,33 @@ export function createSchema<
      * @default "default"
      */
     name?: string;
-    middleware?: BaseMiddleware<UpdaterCtx<S>>[];
+    middleware?: BaseMiddleware<UpdaterCtx<SliceFromSchema<O>>>[];
   } = {},
-): FxSchema<S, O> {
+): FxSchema<O> {
   enablePatches();
 
-  return createSchemaWithUpdater<O, S>(slices ?? defaultSchema<O>(), {
+  return createSchemaWithUpdater(slices ?? defaultSchema<O>(), {
     name: options.name,
     middleware: options.middleware,
-    createUpdateMdw: (store: FxStore<S>) =>
-      function* updateMdw(ctx: UpdaterCtx<S>, next: Next) {
-        const upds: StoreUpdater<S>[] = Array.isArray(ctx.updater)
-          ? ctx.updater
-          : [ctx.updater];
+    *updateMdw(ctx: UpdaterCtx<SliceFromSchema<O>>, next: Next) {
+      const store: FxStore<O> = yield* expectStore<O>();
+      const upds: StoreUpdater<SliceFromSchema<O>>[] = Array.isArray(
+        ctx.updater,
+      )
+        ? ctx.updater
+        : [ctx.updater];
 
-        const [nextState, patches, _] = produceWithPatches<S>(
-          store.getState(),
-          (draft: Draft<S>) => {
-            upds.forEach((updater) => updater(draft));
-          },
-        );
-        ctx.patches = patches;
+      const [nextState, patches, _] = produceWithPatches<SliceFromSchema<O>>(
+        store.getState(),
+        (draft: Draft<SliceFromSchema<O>>) => {
+          upds.forEach((updater) => updater(draft));
+        },
+      );
+      ctx.patches = patches;
 
-        store.setState(nextState);
+      store.setState(nextState);
 
-        yield* next();
-      },
+      yield* next();
+    },
   });
 }

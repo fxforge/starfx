@@ -1,6 +1,5 @@
 import {
   type Callable,
-  Ok,
   type Operation,
   type Scope,
   type Task,
@@ -11,13 +10,19 @@ import {
   lift,
   suspend,
 } from "effection";
-import { API_ACTION_PREFIX, ActionContext, emit } from "../action.js";
-import type { BaseMiddleware } from "../compose.js";
+import { ActionContext, emit } from "../action.js";
 import { createReplaySignal } from "../fx/replay-signal.js";
-import type { AnyAction, AnyState, Next } from "../types.js";
-import { StoreContext, StoreUpdateContext } from "./context.js";
+import type { AnyAction } from "../types.js";
+import { StoreContext } from "./context.js";
 import { createRun } from "./run.js";
-import type { FxSchema, FxStore, Listener, UpdaterCtx } from "./types.js";
+import type {
+  FxMap,
+  FxSchema,
+  FxStore,
+  Listener,
+  SliceFromSchema,
+  UpdaterCtx,
+} from "./types.js";
 const stubMsg = "This is merely a stub, not implemented";
 
 let id = 0;
@@ -34,22 +39,21 @@ function observable() {
   };
 }
 
-export interface CreateStore<S extends AnyState> {
+export interface CreateStore<O extends FxMap> {
   scope?: Scope;
-  schemas: FxSchema<S, any>[];
+  schemas: FxSchema<O>[];
 }
 
 export const IdContext = createContext("starfx:id", 0);
+export const ListenersContext = createContext<Set<Listener>>(
+  "starfx:store:listeners",
+  new Set<Listener>(),
+);
 
-// Context to share store's tail middleware with schemas
-export const StoreTailMdwContext = createContext<
-  BaseMiddleware<UpdaterCtx<AnyState>>[]
->("starfx:store-tail-mdw", [] as BaseMiddleware<UpdaterCtx<AnyState>>[]);
-
-export function createStore<S extends AnyState>({
+export function createStore<O extends FxMap>({
   scope: initScope,
   schemas,
-}: CreateStore<S>): FxStore<S> {
+}: CreateStore<O>): FxStore<O> {
   let scope: Scope;
   if (initScope) {
     scope = initScope;
@@ -59,14 +63,18 @@ export function createStore<S extends AnyState>({
   }
 
   // Build initial state from all schemas
-  const initialState = schemas.reduce((acc, schema) => {
-    return Object.assign(acc, schema.initialState);
-  }, {} as AnyState) as S;
+  const initialState = schemas.reduce(
+    (acc, schema) => {
+      return Object.assign(acc, schema.initialState);
+    },
+    {} as SliceFromSchema<O>,
+  );
   let state = initialState;
   const listeners = new Set<Listener>();
+  scope.set(ListenersContext, listeners);
 
   const signal = createSignal<AnyAction, void>();
-  const watch = createReplaySignal<any, void>();
+  const watch = createReplaySignal<Callable<Operation<void>>, void>();
   scope.set(ActionContext, signal);
   scope.set(IdContext, id++);
 
@@ -78,7 +86,7 @@ export function createStore<S extends AnyState>({
     return state;
   }
 
-  function setState(newState: S) {
+  function setState(newState: SliceFromSchema<O>) {
     state = newState;
   }
 
@@ -94,36 +102,6 @@ export function createStore<S extends AnyState>({
   function dispatch(action: AnyAction | AnyAction[]) {
     emit({ signal, action });
   }
-
-  function* logMdw(ctx: UpdaterCtx<S>, next: Next) {
-    yield* lift(dispatch)({
-      type: `${API_ACTION_PREFIX}store`,
-      payload: ctx,
-    });
-    yield* next();
-  }
-
-  function* notifyChannelMdw(_: UpdaterCtx<S>, next: Next) {
-    const chan = yield* StoreUpdateContext.expect();
-    yield* chan.send();
-    yield* next();
-  }
-
-  function* notifyListenersMdw(_: UpdaterCtx<S>, next: Next) {
-    listeners.forEach((f) => f());
-    yield* next();
-  }
-
-  // Set the store's tail middleware in context for schemas to use
-  const storeTailMdw: BaseMiddleware<UpdaterCtx<S>>[] = [
-    logMdw,
-    notifyChannelMdw,
-    notifyListenersMdw,
-  ];
-  scope.set(
-    StoreTailMdwContext,
-    storeTailMdw as BaseMiddleware<UpdaterCtx<AnyState>>[],
-  );
 
   function manage<Resource>(name: string, inputResource: Operation<Resource>) {
     const CustomContext = createContext<Resource>(name);
@@ -154,18 +132,18 @@ export function createStore<S extends AnyState>({
   }
 
   // Use the first schema as the default
-  const schema: FxSchema<S, any> = schemas[0] as FxSchema<S, any>;
+  const schema = schemas[0];
 
   // Build schemas map by name for selective access
   const schemasMap = schemas.reduce(
     (acc, s) => {
-      acc[s.name] = s as FxSchema<any, any>;
+      acc[s.name] = s;
       return acc;
     },
-    {} as Record<string, FxSchema<any, any>>,
+    {} as Record<string, FxSchema<O>>,
   );
 
-  const store: FxStore<S> = {
+  const store: FxStore<O> = {
     getScope,
     getState,
     setState,
@@ -179,8 +157,8 @@ export function createStore<S extends AnyState>({
     // refer to pieces of business logic -- that can also mutate state
     dispatch,
     // stubs so `react-redux` is happy
-    replaceReducer<S = any>(
-      _nextReducer: (_s: S, _a: AnyAction) => void,
+    replaceReducer(
+      _nextReducer: (s: SliceFromSchema<O>, a: AnyAction) => SliceFromSchema<O>,
     ): void {
       throw new Error(stubMsg);
     },
@@ -188,11 +166,6 @@ export function createStore<S extends AnyState>({
     [Symbol.observable]: observable,
   };
 
-  scope.set(StoreContext, store as FxStore<AnyState>);
+  scope.set(StoreContext, store as FxStore<FxMap>);
   return store;
 }
-
-/**
- * @deprecated use {@link createStore}
- */
-export const configureStore = createStore;

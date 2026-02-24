@@ -32,7 +32,7 @@ test("sets up an obj", async () => {
     schemas: [schema],
   });
 
-  await store.run(function* () {
+  await store.initialize(function* () {
     yield* updateStore(
       slice.set({
         username: "bob",
@@ -50,7 +50,7 @@ test("sets up an obj", async () => {
     roles: ["admin", "user"],
   });
 
-  await store.run(function* () {
+  await store.initialize(function* () {
     yield* updateStore(slice.update({ key: "username", value: "alice" }));
   });
 
@@ -61,7 +61,7 @@ test("sets up an obj", async () => {
     roles: ["admin", "user"],
   });
 
-  await store.run(function* () {
+  await store.initialize(function* () {
     yield* updateStore(
       slice.update({ key: "roles", value: ["admin", "superuser"] }),
     );

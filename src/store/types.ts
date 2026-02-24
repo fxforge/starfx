@@ -1,12 +1,19 @@
 import type { Context, Operation, Scope, Task } from "effection";
-import type { Draft, Patch } from "immer";
-import type { BaseCtx } from "../index.js";
+import type { Draft, Immutable, Patch } from "immer";
+import type { BaseCtx, BaseMiddleware } from "../index.js";
 import type { AnyAction, AnyState } from "../types.js";
 import type { createRun } from "./run.js";
 import type { LoaderOutput } from "./slice/loaders.js";
 import type { TableOutput } from "./slice/table.js";
 
-export type StoreUpdater<S extends AnyState> = (s: S | Draft<S>) => S | void;
+export type StoreUpdater<S extends AnyState> = (s: Draft<S>) => S | void;
+
+export type SliceActionFn<S, P = unknown, R = void> = (
+  p: P,
+) => (s: Draft<S>) => R;
+export type SliceSelectorFn<S, P = void, R = unknown> = P extends void
+  ? (s: S) => R
+  : (s: S, p: P) => R;
 
 export type Listener = () => void;
 
@@ -31,35 +38,52 @@ export type Output<O extends { [key: string]: BaseSchema<unknown> }> = {
   [key in keyof O]: O[key]["initialState"];
 };
 
+export type SliceState<T> = Record<string, Immutable<T>>;
 export interface FxMap {
   // keep a typed shape for default slices while allowing user-defined slices
-  loaders?: (s: string) => LoaderOutput<AnyState, AnyState>;
-  cache?: (s: string) => TableOutput<AnyState, AnyState>;
+  loaders?: (s: string) => LoaderOutput;
+  cache?: (s: string) => TableOutput<AnyState>;
   [key: string]: ((name: string) => BaseSchema<unknown>) | undefined;
 }
 
-export type FxSchema<S extends AnyState, O extends FxMap = FxMap> = {
+// Helper types to extract the factory return type and its initialState
+export type FactoryReturn<T> = T extends (name: string) => infer R ? R : never;
+export type FactoryInitial<T> = FactoryReturn<
+  NonNullable<T>
+> extends BaseSchema<infer IS>
+  ? IS
+  : never;
+export type SliceFromSchema<O extends FxMap> = {
+  [K in keyof O]: FactoryInitial<O[K]>;
+};
+
+export type FxSchema<O extends FxMap = FxMap> = {
   [key in keyof O]: ReturnType<NonNullable<O[key]>>;
 } & {
   name: string;
-  update: (u: StoreUpdater<S> | StoreUpdater<S>[]) => Operation<UpdaterCtx<S>>;
-  initialState: S;
-  reset: <K extends keyof S = keyof S>(
+  initialize: (
+    storeTailMdw: BaseMiddleware<UpdaterCtx<SliceFromSchema<O>>>[],
+  ) => Operation<void>;
+  update: (
+    u: StoreUpdater<SliceFromSchema<O>> | StoreUpdater<SliceFromSchema<O>>[],
+  ) => Operation<UpdaterCtx<SliceFromSchema<O>>>;
+  initialState: SliceFromSchema<O>;
+  reset: <K extends keyof SliceFromSchema<O> = keyof SliceFromSchema<O>>(
     ignoreList?: K[],
-  ) => Operation<UpdaterCtx<S>>;
+  ) => Operation<UpdaterCtx<SliceFromSchema<O>>>;
 };
 
-export interface FxStore<S extends AnyState> {
+export interface FxStore<O extends FxMap> {
   getScope: () => Scope;
   // part of redux store API
-  getState: () => S;
-  setState: (s: S) => void;
+  getState: () => SliceFromSchema<O>;
+  setState: (s: SliceFromSchema<O>) => void;
   // part of redux store API
   subscribe: (fn: Listener) => () => void;
   // the default schema for this store
-  schema: FxSchema<S, FxMap>;
+  schema: FxSchema<O>;
   // all schemas by name
-  schemas: Record<string, FxSchema<AnyState, FxMap>>;
+  schemas: Record<string, FxSchema<O>>;
   manage: <Resource>(
     name: string,
     resource: Operation<Resource>,
@@ -69,12 +93,14 @@ export interface FxStore<S extends AnyState> {
   // part of redux store API
   dispatch: (a: AnyAction | AnyAction[]) => unknown;
   // part of redux store API
-  replaceReducer: (r: (s: S, a: AnyAction) => S) => void;
-  getInitialState: () => S;
+  replaceReducer: (
+    r: (s: SliceFromSchema<O>, a: AnyAction) => SliceFromSchema<O>,
+  ) => void;
+  getInitialState: () => SliceFromSchema<O>;
   [Symbol.observable]: () => unknown;
 }
 
 export interface QueryState {
-  cache: TableOutput<any, any>["initialState"];
-  loaders: LoaderOutput<any, any>["initialState"];
+  cache: TableOutput<AnyState>["initialState"];
+  loaders: LoaderOutput["initialState"];
 }

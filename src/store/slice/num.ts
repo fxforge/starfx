@@ -1,49 +1,58 @@
-import type { AnyState } from "../../types.js";
-import type { BaseSchema } from "../types.js";
+import type { Draft, Immutable } from "immer";
+import type { BaseSchema, SliceState } from "../types.js";
 
-export interface NumOutput<S extends AnyState> extends BaseSchema<number> {
-  schema: "num";
-  initialState: number;
-  set: (v: number) => (s: S) => void;
-  increment: (by?: number) => (s: S) => void;
-  decrement: (by?: number) => (s: S) => void;
-  reset: () => (s: S) => void;
-  select: (s: S) => number;
+type NumRootState = SliceState<number>;
+
+export interface NumActions {
+  set: (v: number) => (s: Draft<NumRootState>) => void;
+  reset: () => (s: Draft<NumRootState>) => void;
+  increment: (by?: number) => (s: Draft<NumRootState>) => void;
+  decrement: (by?: number) => (s: Draft<NumRootState>) => void;
 }
 
-export function createNum<S extends AnyState = AnyState>({
+export interface NumSelectors {
+  select: (s: Immutable<NumRootState>) => number;
+}
+
+export interface NumOutput
+  extends BaseSchema<number>,
+    NumActions,
+    NumSelectors {
+  schema: "num";
+  initialState: number;
+}
+
+export function createNum({
   name,
   initialState = 0,
 }: {
-  name: keyof S;
+  name: keyof NumRootState;
   initialState?: number;
-}): NumOutput<S> {
+}): NumOutput {
   return {
-    name: name as string,
+    name: String(name),
     schema: "num",
     initialState,
     set: (value) => (state) => {
-      (state as any)[name] = value;
+      state[name] = value;
     },
     increment:
       (by = 1) =>
       (state) => {
-        (state as any)[name] += by;
+        state[name] += by;
       },
     decrement:
       (by = 1) =>
       (state) => {
-        (state as any)[name] -= by;
+        state[name] -= by;
       },
     reset: () => (state) => {
-      (state as any)[name] = initialState;
+      state[name] = initialState;
     },
-    select: (state) => {
-      return (state as any)[name];
-    },
-  };
+    select: (state) => state[name],
+  } satisfies NumOutput;
 }
 
 export function num(initialState?: number) {
-  return (name: string) => createNum<AnyState>({ name, initialState });
+  return (name: string) => createNum({ name, initialState });
 }

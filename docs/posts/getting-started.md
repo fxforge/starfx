@@ -131,16 +131,27 @@ function Example() {
 
 # Install
 
+> [!NOTE]
+> `starfx` uses `effection` (v4) internally for structured concurrency. You will also find use of it in your thunks. It is required as a peer dependency which allows for more direct upgrading as APIs evolve.
+
 ```bash
-npm install starfx
+npm install starfx effection
 ```
 
 ```bash
-yarn add starfx
+yarn add starfx effection
 ```
+
+Or in deno:
 
 ```ts
-import * as starfx from "https://deno.land/x/starfx@0.13.2/mod.ts";
+import * as starfx from "https://deno.land/x/starfx@0.16.0/mod.ts";
+```
+
+**Note:** `starfx` has a peer dependency on `effection@^4` and `react-redux@^9`. Install it in your project:
+
+```bash
+npm install effection@^4 react-redux@^9
 ```
 
 # Effection

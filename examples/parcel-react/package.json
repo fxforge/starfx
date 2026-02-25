@@ -1,5 +1,5 @@
 {
-  "name": "starfx-parcel",
+  "name": "parcel-react",
   "source": "src/index.html",
   "scripts": {
     "start": "parcel --host 0.0.0.0",
@@ -12,13 +12,15 @@
   "alias": {
     "node:process": false
   },
+  "dependencies": {
+    "effection": "^4",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "react-redux": "^9.1.2",
+    "starfx": "file:../.."
+  },
   "devDependencies": {
     "parcel": "^2.15.4",
     "process": "^0.11.10"
-  },
-  "dependencies": {
-    "react": "^19.1.0",
-    "react-dom": "^19.1.0",
-    "starfx": "file:../.."
   }
 }

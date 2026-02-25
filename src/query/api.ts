@@ -5,25 +5,85 @@ import type { ThunksApi } from "./thunk.js";
 import type { ApiCtx, ApiRequest } from "./types.js";
 
 /**
- * Creates a middleware thunksline for HTTP requests.
+ * Creates a middleware pipeline for HTTP requests.
  *
  * @remarks
- * It uses {@link createThunks} under the hood.
+ * An API is a specialized thunk system designed to manage HTTP requests. It provides:
+ * - HTTP method helpers (`.get()`, `.post()`, `.put()`, `.patch()`, `.delete()`, etc.)
+ * - A router that maps action names to URL patterns
+ * - Automatic request/response handling via middleware
+ * - Built-in caching support with `api.cache()`
  *
- * @example
+ * The action name becomes the URL pattern, with support for URL parameters
+ * (e.g., `/users/:id`). Empty parameters cause the request to bail early.
+ *
+ * Uses {@link createThunks} under the hood.
+ *
+ * @typeParam Ctx - The context type extending {@link ApiCtx}.
+ * @param baseThunk - Optional base thunks instance to extend.
+ * @returns A {@link QueryApi} with HTTP method helpers and middleware registration.
+ *
+ * @see {@link createThunks} for the underlying thunk system.
+ * @see {@link mdw.api} for the recommended middleware stack.
+ * @see {@link mdw.fetch} for the fetch implementation.
+ *
+ * @example Basic setup
  * ```ts
- * import { createApi, mdw } from 'starfx';
+ * import { createApi, createStore, mdw } from 'starfx';
+ * import { schema, initialState } from './schema';
  *
  * const api = createApi();
- * api.use(mdw.api());
+ * api.use(mdw.api({ schema }));
  * api.use(api.routes());
- * api.use(mdw.fetch({ baseUrl: 'https://api.com' }));
+ * api.use(mdw.fetch({ baseUrl: 'https://api.example.com' }));
  *
- * const fetchUsers = api.get('/users', function*(ctx, next) {
- *   yield next();
- * });
+ * // GET request with automatic caching
+ * export const fetchUsers = api.get('/users', api.cache());
+ *
+ * // POST request with payload
+ * export const createUser = api.post<{ name: string }>(
+ *   '/users',
+ *   function* (ctx, next) {
+ *     ctx.request = ctx.req({
+ *       body: JSON.stringify({ name: ctx.payload.name }),
+ *     });
+ *     yield* next();
+ *   }
+ * );
+ *
+ * const store = createStore({ initialState });
+ * store.run(api.register);
  *
  * store.dispatch(fetchUsers());
+ * store.dispatch(createUser({ name: 'Alice' }));
+ * ```
+ *
+ * @example URL parameters
+ * ```ts
+ * // Parameters are extracted from payload
+ * const fetchUser = api.get<{ id: string }>('/users/:id');
+ * store.dispatch(fetchUser({ id: '123' }));
+ * // Makes GET request to /users/123
+ * ```
+ *
+ * @example Response typing
+ * ```ts
+ * interface User { id: string; name: string; }
+ * interface ApiError { message: string; }
+ *
+ * const fetchUsers = api.get<never, User[], ApiError>(
+ *   '/users',
+ *   function* (ctx, next) {
+ *     yield* next();
+ *     if (ctx.json.ok) {
+ *       // ctx.json.value is User[]
+ *       console.log(ctx.json.value);
+ *     } else {
+ *       // ctx.json.error is ApiError
+ *       console.error(ctx.json.error.message);
+ *     }
+ *   }
+ * );
  * ```
  */
 export function createApi<Ctx extends ApiCtx = ApiCtx>(

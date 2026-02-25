@@ -183,6 +183,18 @@ export function createSchemaWithUpdater<O extends FxMap>(
   return schema;
 }
 
+/**
+ * Creates a schema object from slice factories.
+ *
+ * @remarks
+ * A schema defines the shape of application state and provides reusable
+ * state helpers via generated slices. By default, `createSchema` includes
+ * `cache` and `loaders` slices used by starfx middleware and supervisors.
+ *
+ * @param slices - A map of slice factory functions.
+ * @param options - Schema options including `name` and custom middleware.
+ * @returns A configured schema with `update`, `reset`, and generated slices.
+ */
 export function createSchema<O extends FxMap>(
   slices?: O,
   options: {

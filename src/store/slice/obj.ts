@@ -56,6 +56,23 @@ export function createObj<V extends ObjBase>({
   } satisfies ObjOutput<V>;
 }
 
+/**
+ * Public object slice API used in `createSchema` definitions.
+ *
+ * @remarks
+ * `update` mutates a single property while preserving the rest of the object.
+ * If no object exists at runtime, it initializes one with the updated property.
+ *
+ * @param initialState - The initial object used for the slice.
+ * @returns A factory consumed by `createSchema` with the slice name.
+ *
+ * @example
+ * ```ts
+ * const schema = createSchema({
+ *   settings: slice.obj({ theme: "light", notifications: true }),
+ * });
+ * ```
+ */
 export function obj<V extends ObjBase>(initialState: V) {
   return (name: string) => createObj<V>({ name, initialState });
 }

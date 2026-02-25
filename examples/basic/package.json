@@ -1,5 +1,5 @@
 {
-  "name": "vite-react",
+  "name": "basic-react",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -10,8 +10,10 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "effection": "^4",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
+    "react-redux": "^9.1.2",
     "starfx": "file:../.."
   },
   "devDependencies": {

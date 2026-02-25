@@ -57,21 +57,51 @@ export interface UseCacheResult<D, A extends ThunkAction = ThunkAction>
 
 const SchemaContext = createContext<FxSchema<FxMap> | null>(null);
 
-// Strongly-typed overload that ties `store` and `schema` to the same state type S
+/**
+ * React Provider to wire the `FxStore` and schema into React context.
+ *
+ * @remarks
+ * Wrap your application with this provider to make hooks like
+ * {@link useSchema}, {@link useStore}, {@link useLoader}, {@link useApi},
+ * {@link useQuery}, and {@link useCache} available to all descendants.
+ *
+ * This provider integrates with react-redux internally, so standard Redux
+ * DevTools will work with your starfx store.
+ *
+ * @param props - Provider props.
+ * @param props.store - The {@link FxStore} instance created by {@link createStore}.
+ * @param props.schema - Optional schema created by {@link createSchema}; defaults to `store.schema`.
+ * @param props.children - React children to render.
+ *
+ * @see {@link createStore} for creating the store.
+ * @see {@link createSchema} for creating the schema.
+ *
+ * @example
+ * ```tsx
+ * import { Provider } from 'starfx/react';
+ * import { store, schema } from './store';
+ *
+ * function App() {
+ *   return (
+ *     <Provider store={store} schema={schema}>
+ *       <MyApp />
+ *     </Provider>
+ *   );
+ * }
+ * ```
+ */
 export function Provider<O extends FxMap>(props: {
   store: FxStore<O>;
   schema?: FxSchema<O>;
   children?: React.ReactNode;
 }): React.ReactElement;
 
-// Provider overload accepting any store and schema to avoid variance issues
 export function Provider(props: {
   store: FxStore<FxMap>;
   schema?: FxSchema<FxMap>;
   children?: React.ReactNode;
 }): React.ReactElement;
 
-// Runtime implementation uses `AnyState` for minimal widening
 export function Provider(props: {
   store: FxStore<FxMap>;
   schema?: FxSchema<FxMap>;
@@ -113,25 +143,34 @@ export function useStore<O extends FxMap>() {
 }
 
 /**
- * useLoader will take an action creator or action itself and return the associated
- * loader for it.
+ * Get the loader state for an action creator or action.
  *
- * @returns the loader object for an action creator or action
+ * @remarks
+ * Loaders track the lifecycle of thunks and endpoints (idle, loading, success, error).
+ * This hook subscribes to loader state and triggers re-renders when it changes.
+ *
+ * The returned {@link LoaderState} includes convenience booleans:
+ * - `isIdle` - Initial state, never run
+ * - `isLoading` - Currently executing
+ * - `isSuccess` - Completed successfully
+ * - `isError` - Completed with an error
+ * - `isInitialLoading` - Loading AND never succeeded before
+ *
+ * @typeParam O - Schema map constrained to include `loaders`.
+ * @param action - The action creator or dispatched action to track.
+ * @returns The loader state for the action.
+ *
+ * @see {@link useApi} for combining loader with trigger function.
+ * @see {@link useQuery} for auto-triggering on mount.
  *
  * @example
- * ```ts
- * import { useLoader } from 'starfx/react';
+ * ```tsx
+ * function UserStatus() {
+ *   const loader = useLoader(fetchUsers());
  *
- * import { api } from './api';
- *
- * const fetchUsers = api.get('/users', function*() {
- *   // ...
- * });
- *
- * const View = () => {
- *   const loader = useLoader(fetchUsers);
- *   // or: const loader = useLoader(fetchUsers());
- *   return <div>{loader.isLoader ? 'Loading ...' : 'Done!'}</div>
+ *   if (loader.isLoading) return <Spinner />;
+ *   if (loader.isError) return <Error message={loader.message} />;
+ *   return <div>Users loaded!</div>;
  * }
  * ```
  */
@@ -148,29 +187,32 @@ export function useLoader(action: any) {
 }
 
 /**
- * useApi will take an action creator or action itself and fetch
- * the associated loader and create a `trigger` function that you can call
- * later in your react component.
+ * Get loader state and a trigger function for an action.
  *
- * This hook will *not* fetch the data for you because it does not know how to fetch
- * data from your redux state.
+ * @remarks
+ * Combines {@link useLoader} with a `trigger` function for dispatching the action.
+ * Does not automatically fetch data - use `trigger()` to initiate execution.
+ *
+ * For automatic fetching on mount, use {@link useQuery}.
+ *
+ * @typeParam P - Payload type for action creators.
+ * @typeParam A - Thunk/action type.
+ * @param action - The action creator or dispatched action.
+ * @returns An object with loader state and trigger function.
+ *
+ * @see {@link useQuery} for auto-triggering on mount.
+ * @see {@link useCache} for auto-triggering with cached data.
  *
  * @example
- * ```ts
- * import { useApi } from 'starfx/react';
+ * ```tsx
+ * function CreateUserForm() {
+ *   const { isLoading, trigger } = useApi(createUser);
  *
- * import { api } from './api';
+ *   const handleSubmit = (name: string) => {
+ *     trigger({ name });
+ *   };
  *
- * const fetchUsers = api.get('/users', function*() {
- *   // ...
- * });
- *
- * const View = () => {
- *   const { isLoading, trigger } = useApi(fetchUsers);
- *   useEffect(() => {
- *     trigger();
- *   }, []);
- *   return <div>{isLoading ? : 'Loading' : 'Done!'}</div>
+ *   return <button onClick={() => handleSubmit("bob")}>{isLoading ? "Creating..." : "Create"}</button>;
  * }
  * ```
  */
@@ -197,23 +239,14 @@ export function useApi(action: any): any {
 }
 
 /**
- * useQuery uses {@link useApi} and automatically calls `useApi().trigger()`
+ * Auto-triggering variant of {@link useApi}.
  *
- * @example
- * ```ts
- * import { useQuery } from 'starfx/react';
+ * @remarks
+ * Automatically dispatches the action on mount and when `action.payload.key`
+ * changes. Useful for fetch-on-render patterns.
  *
- * import { api } from './api';
- *
- * const fetchUsers = api.get('/users', function*() {
- *   // ...
- * });
- *
- * const View = () => {
- *   const { isLoading } = useQuery(fetchUsers);
- *   return <div>{isLoading ? : 'Loading' : 'Done!'}</div>
- * }
- * ```
+ * @param action - The dispatched action to execute.
+ * @returns Loader state and trigger function.
  */
 export function useQuery<P = any, A extends ThunkAction = ThunkAction<P>>(
   action: A,
@@ -226,21 +259,20 @@ export function useQuery<P = any, A extends ThunkAction = ThunkAction<P>>(
 }
 
 /**
- * useCache uses {@link useQuery} and automatically selects the cached data associated
- * with the action creator or action provided.
+ * Auto-fetch with cached data selection.
+ *
+ * @remarks
+ * Combines {@link useQuery} with automatic selection of cached response data.
+ * The endpoint must use cache middleware to populate the cache table.
+ *
+ * @param action - Dispatched action with cache enabled.
+ * @returns Loader state, trigger function, and selected cache data.
  *
  * @example
  * ```ts
- * import { useCache } from 'starfx/react';
- *
- * import { api } from './api';
- *
- * const fetchUsers = api.get('/users', api.cache());
- *
- * const View = () => {
- *   const { isLoading, data } = useCache(fetchUsers());
- *   return <div>{isLoading ? : 'Loading' : data.length}</div>
- * }
+ * const { isLoading, data } = useCache(fetchUsers());
+ * if (isLoading && !data) return <Spinner />;
+ * return <Users users={data || []} />;
  * ```
  */
 export function useCache(action: ThunkAction): UseCacheResult<any, ThunkAction>;
@@ -260,32 +292,20 @@ export function useCache(action: any) {
 }
 
 /**
- * useLoaderSuccess will activate the callback provided when the loader transitions
- * from some state to success.
+ * Execute a callback when a loader transitions to success.
+ *
+ * @remarks
+ * Watches the loader status and fires the callback when it changes from any
+ * non-success state to `success`.
+ *
+ * @param cur - Loader state to watch.
+ * @param success - Callback to execute on success transition.
  *
  * @example
  * ```ts
- * import { useLoaderSuccess, useApi } from 'starfx/react';
- *
- * import { api } from './api';
- *
- * const createUser = api.post('/users', function*(ctx, next) {
- *   // ...
+ * useLoaderSuccess(loader, () => {
+ *   navigate('/users');
  * });
- *
- * const View = () => {
- *  const { loader, trigger } = useApi(createUser);
- *  const onSubmit = () => {
- *    trigger({ name: 'bob' });
- *  };
- *
- *  useLoaderSuccess(loader, () => {
- *    // success!
- *    // Use this callback to navigate to another view
- *  });
- *
- *  return <button onClick={onSubmit}>Create user!</button>
- * }
  * ```
  */
 export function useLoaderSuccess(
@@ -310,6 +330,13 @@ function Loading({ text }: { text: string }) {
   return h("div", null, text);
 }
 
+/**
+ * Delay rendering until persistence rehydration completes.
+ *
+ * @remarks
+ * Displays a loading view until the loader identified by `PERSIST_LOADER_ID`
+ * reaches success.
+ */
 export function PersistGate({
   children,
   loading = h(Loading),

@@ -17,6 +17,26 @@ interface PropIds {
 
 const excludesFalse = <T>(n?: T): n is T => Boolean(n);
 
+/**
+ * Create a default loader item with sensible defaults.
+ *
+ * @remarks
+ * Returns a complete LoaderItemState with these defaults:
+ * - `id`: empty string
+ * - `status`: `idle`
+ * - `message`: empty string
+ * - `lastRun`: 0
+ * - `lastSuccess`: 0
+ * - `meta`: empty object
+ *
+ * @param li - Partial fields to override defaults.
+ * @returns A fully populated loader item.
+ *
+ * @example
+ * ```ts
+ * const loader = defaultLoaderItem({ id: "fetch-users" });
+ * ```
+ */
 export function defaultLoaderItem(
   li: Partial<LoaderItemState> = {},
 ): LoaderItemState {
@@ -31,6 +51,26 @@ export function defaultLoaderItem(
   };
 }
 
+/**
+ * Create a loader state with computed helper booleans.
+ *
+ * @remarks
+ * Extends `defaultLoaderItem` with convenience booleans:
+ * - `isIdle`
+ * - `isLoading`
+ * - `isSuccess`
+ * - `isError`
+ * - `isInitialLoading` (loading and never succeeded)
+ *
+ * @param l - Partial loader fields to normalize.
+ * @returns A loader state with helper booleans.
+ *
+ * @example
+ * ```ts
+ * const loader = defaultLoader({ status: "loading", lastSuccess: 0 });
+ * loader.isInitialLoading; // true
+ * ```
+ */
 export function defaultLoader(l: Partial<LoaderItemState> = {}): LoaderState {
   const loading = defaultLoaderItem(l);
   return {
@@ -169,6 +209,24 @@ export const createLoaders = ({
   return output;
 };
 
+/**
+ * Public loader slice API used in `createSchema` definitions.
+ *
+ * @remarks
+ * Tracks async lifecycle status for thunks/endpoints and exposes:
+ * - updaters: `start`, `success`, `error`, `reset`, `resetByIds`
+ * - selectors: `selectById`, `selectByIds`, `selectTable`, `selectTableAsList`
+ *
+ * @param initialState - Optional initial loader table.
+ * @returns A factory consumed by `createSchema` with the slice name.
+ *
+ * @example
+ * ```ts
+ * const schema = createSchema({
+ *   loaders: slice.loaders(),
+ * });
+ * ```
+ */
 export function loaders(initialState?: Record<string, LoaderItemState>) {
   return (name: string) => createLoaders({ name, initialState });
 }

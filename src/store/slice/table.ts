@@ -195,6 +195,42 @@ export function createTable<Entity = unknown>({
   return output;
 }
 
+/**
+ * Public table slice API used in `createSchema` definitions.
+ *
+ * @remarks
+ * The table slice mimics a normalized entity table with `id -> entity` storage.
+ *
+ * Available selectors:
+ * - `selectTable`
+ * - `selectTableAsList`
+ * - `selectById`
+ * - `selectByIds`
+ *
+ * Available updaters:
+ * - `add`
+ * - `set`
+ * - `remove`
+ * - `patch`
+ * - `merge`
+ * - `reset`
+ *
+ * If `empty` is provided and `selectById` misses, the selector returns that
+ * value instead of `undefined`.
+ *
+ * @param options.initialState - Optional initial entity map.
+ * @param options.empty - Optional empty entity or factory.
+ * @returns A factory consumed by `createSchema` with the slice name.
+ *
+ * @example
+ * ```ts
+ * const schema = createSchema({
+ *   users: slice.table<User>({
+ *     empty: { id: "", name: "" },
+ *   }),
+ * });
+ * ```
+ */
 export function table<Entity = unknown>(
   options: {
     initialState?: Record<IdProp, Entity>;

@@ -49,6 +49,23 @@ export function createAny<V>({
   } satisfies AnyOutput<V>;
 }
 
+/**
+ * Public API for creating a generic unconstrained-value slice in `createSchema`.
+ *
+ * @remarks
+ * Use this when the slice shape is intentionally open-ended.
+ * For richer semantics, prefer dedicated slices like `table`, `obj`, or `num`.
+ *
+ * @param initialState - The initial value for the slice.
+ * @returns A factory consumed by `createSchema` with the slice name.
+ *
+ * @example
+ * ```ts
+ * const schema = createSchema({
+ *   runtime: slice.any<Record<string, unknown>>({}),
+ * });
+ * ```
+ */
 export function any<V>(initialState: V) {
   return (name: string) => createAny<V>({ name, initialState });
 }

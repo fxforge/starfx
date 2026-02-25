@@ -8,54 +8,77 @@ export interface ParallelRet<T> extends Operation<Result<T>[]> {
 }
 
 /**
- * The goal of `parallel` is to make it easier to cooridnate multiple async
- * operations in parallel, with different ways to receive completed tasks.
+ * Run multiple operations in parallel with flexible result handling.
  *
- * All tasks are called with {@link safe} which means they will never
- * throw an exception.  Instead all tasks will return a Result object that
- * the end development must evaluate in order to grab the value.
+ * @remarks
+ * The `parallel` function makes it easier to coordinate multiple async
+ * operations with different ways to receive completed tasks.
  *
- * @example
+ * All tasks are wrapped with {@link safe}, so they will never throw an
+ * exception. Instead, all tasks return a {@link Result} that must be
+ * evaluated to access the value or error.
+ *
+ * The returned resource provides three ways to consume results:
+ * - **Await all**: `yield* task` waits for all operations to complete
+ * - **Immediate**: `task.immediate` channel yields results as they complete
+ * - **Sequence**: `task.sequence` channel yields results in original array order
+ *
+ * @typeParam T - The return type of operations.
+ * @typeParam TArgs - Argument types for operations.
+ * @param operations - Array of operation factories to run in parallel.
+ * @returns A resource that provides multiple ways to access results.
+ *
+ * @see {@link safe} for the error-handling wrapper.
+ * @see {@link each} from Effection for iterating over channels.
+ *
+ * @example Wait for all results
  * ```ts
- * import { parallel } from "starfx";
+ * import { parallel } from 'starfx';
  *
  * function* run() {
- *  const task = yield* parallel([job1, job2]);
- *  // wait for all tasks to complete before moving to next yield point
- *  const results = yield* task;
- *  // job1 = results[0];
- *  // job2 = results[1];
+ *   const task = yield* parallel([fetchUsers, fetchPosts, fetchComments]);
+ *
+ *   // Wait for all tasks to complete
+ *   const results = yield* task;
+ *   // results[0] = fetchUsers result
+ *   // results[1] = fetchPosts result
+ *   // results[2] = fetchComments result
+ *
+ *   for (const result of results) {
+ *     if (result.ok) {
+ *       console.log('Success:', result.value);
+ *     } else {
+ *       console.error('Error:', result.error);
+ *     }
+ *   }
  * }
  * ```
  *
- * Instead of waiting for all tasks to complete, we can instead loop over
- * tasks as they arrive:
- *
- * @example
+ * @example Process results as they complete
  * ```ts
+ * import { each } from 'effection';
+ *
  * function* run() {
- *  const task = yield* parallel([job1, job2]);
- *  for (const job of yield* each(task.immediate)) {
- *    // job2 completes first then it will be first in list
- *    console.log(job);
- *    yield* each.next();
- *  }
+ *   const task = yield* parallel([slowJob, fastJob]);
+ *
+ *   // Results arrive in completion order (fastest first)
+ *   for (const result of yield* each(task.immediate)) {
+ *     console.log('Completed:', result);
+ *     yield* each.next();
+ *   }
  * }
  * ```
  *
- * Or we can instead loop over tasks in order of the array provided to
- * parallel:
- *
- * @example
+ * @example Process results in original order
  * ```ts
  * function* run() {
- *  const task = yield* parallel([job1, job2]);
- *  for (const job of yield* each(task.sequence)) {
- *    // job1 then job2 will be returned regardless of when the jobs
- *    // complete
- *    console.log(job);
- *    yield* each.next();
- *  }
+ *   const task = yield* parallel([job1, job2, job3]);
+ *
+ *   // Results arrive in array order regardless of completion time
+ *   for (const result of yield* each(task.sequence)) {
+ *     console.log('Result:', result);
+ *     yield* each.next();
+ *   }
  * }
  * ```
  */

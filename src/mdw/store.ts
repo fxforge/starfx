@@ -27,19 +27,37 @@ function isErrorLike(err: unknown): err is ErrorLike {
 }
 
 /**
- * This middleware is a composition of many middleware used to faciliate
- * the {@link createApi}.
+ * Composed middleware stack recommended for {@link createApi}.
  *
- * It is not required, however, it is battle-tested and highly recommended.
+ * @remarks
+ * This middleware composes the standard middleware needed for API endpoints:
+ * - {@link mdw.err} - Error catching and logging
+ * - {@link mdw.actions} - Batch action dispatch
+ * - {@link mdw.queryCtx} - Initialize API context
+ * - {@link mdw.customKey} - Custom key support
+ * - {@link mdw.nameParser} - Parse URL and method from action name
+ * - {@link mdw.loaderApi} - Automatic loader state tracking
+ * - {@link mdw.cache} - Response caching
  *
- * List of mdw:
- *  - {@link mdw.err}
- *  - {@link mdw.actions}
- *  - {@link mdw.queryCtx}
- *  - {@link mdw.customKey}
- *  - {@link mdw.nameParser}
- *  - {@link mdw.loaderApi}
- *  - {@link mdw.cache}
+ * This provides a battle-tested, production-ready setup for API requests.
+ *
+ * @typeParam Ctx - The API context type.
+ * @typeParam S - The store state type.
+ * @param props - Configuration options.
+ * @param props.schema - The schema containing `loaders` and `cache` slices.
+ * @param props.errorFn - Optional custom function to extract error messages.
+ * @returns A composed middleware function.
+ *
+ * @see {@link createApi} for creating API endpoints.
+ * @see {@link mdw.fetch} for the fetch middleware to add after this.
+ *
+ * @example Standard setup
+ * ```ts
+ * const api = createApi();
+ * api.use(mdw.api({ schema }));
+ * api.use(api.routes());
+ * api.use(mdw.fetch({ baseUrl: 'https://api.example.com' }));
+ * ```
  */
 export function api<Ctx extends ApiCtx = ApiCtx>(props: ApiMdwProps<Ctx>) {
   return compose<Ctx>([
@@ -54,8 +72,34 @@ export function api<Ctx extends ApiCtx = ApiCtx>(props: ApiMdwProps<Ctx>) {
 }
 
 /**
- * This middleware will automatically cache any data found inside `ctx.json`
- * which is where we store JSON data from the {@link mdw.fetch} middleware.
+ * Automatically cache API response data.
+ *
+ * @remarks
+ * When `ctx.cache` is truthy (set by `api.cache()` or manually), this
+ * middleware stores the response JSON in the `cache` slice keyed by `ctx.key`.
+ *
+ * Before the request, it loads any existing cached data into `ctx.cacheData`.
+ * After the request, if caching is enabled, it stores the new response.
+ *
+ * This middleware is included in {@link mdw.api}.
+ *
+ * @typeParam Ctx - The API context type.
+ * @param schema - Object containing the `cache` table slice.
+ * @returns A caching middleware function.
+ *
+ * @see {@link useCache} for React hook that reads cached data.
+ *
+ * @example Enable caching for an endpoint
+ * ```ts
+ * // Method 1: Using api.cache() helper
+ * const fetchUsers = api.get('/users', api.cache());
+ *
+ * // Method 2: Manually enable in middleware
+ * const fetchUsers = api.get('/users', function* (ctx, next) {
+ *   ctx.cache = true;
+ *   yield* next();
+ * });
+ * ```
  */
 export function cache<Ctx extends ApiCtx = ApiCtx>(schema: {
   cache: TableOutput;
@@ -77,7 +121,38 @@ export function cache<Ctx extends ApiCtx = ApiCtx>(schema: {
 }
 
 /**
- * This middleware will track the status of a middleware fn
+ * Track thunk execution status with loaders.
+ *
+ * @remarks
+ * Automatically updates loader state for the thunk:
+ * - Sets `loading` status when the thunk starts
+ * - Sets `success` status when it completes normally
+ * - Sets `error` status with message if it throws
+ *
+ * Loaders are tracked by both `ctx.name` (the thunk name) and `ctx.key`
+ * (the unique action key including payload hash).
+ *
+ * Use this middleware for thunks that don't make HTTP requests but still
+ * need loading state tracking. For API endpoints, use {@link mdw.loaderApi}
+ * instead (included in {@link mdw.api}).
+ *
+ * @typeParam M - The loader metadata type.
+ * @param schema - Object containing the `loaders` slice.
+ * @returns A loader tracking middleware function.
+ *
+ * @example
+ * ```ts
+ * const thunks = createThunks();
+ * thunks.use(mdw.loader({ loaders: schema.loaders }));
+ * thunks.use(thunks.routes());
+ *
+ * const processData = thunks.create('process', function* (ctx, next) {
+ *   // Loader automatically set to 'loading'
+ *   yield* doExpensiveWork();
+ *   yield* next();
+ *   // Loader automatically set to 'success'
+ * });
+ * ```
  */
 export function loader(schema: { loaders: LoaderOutput }) {
   return function* <Ctx extends ThunkCtxWLoader = ThunkCtxWLoader>(
@@ -143,7 +218,29 @@ function defaultErrorFn<Ctx extends ApiCtx = ApiCtx>(ctx: Ctx) {
 }
 
 /**
- * This middleware will track the status of a fetch request.
+ * Track API request status with loaders.
+ *
+ * @remarks
+ * Similar to {@link mdw.loader} but designed for API endpoints. Uses
+ * `ctx.response.ok` to determine success/error status instead of
+ * try/catch alone.
+ *
+ * Status transitions:
+ * - `loading` when request starts
+ * - `success` when `ctx.response.ok` is true
+ * - `error` when `ctx.response.ok` is false or an exception occurs
+ * - Reset to previous state if no response is set
+ *
+ * You can customize the error message extraction by providing an `errorFn`.
+ *
+ * This middleware is included in {@link mdw.api}.
+ *
+ * @typeParam Ctx - The API context type.
+ * @typeParam S - The store state type.
+ * @param props - Configuration options.
+ * @param props.schema - Object containing the `loaders` slice.
+ * @param props.errorFn - Custom function to extract error message from context.
+ * @returns A loader tracking middleware function.
  */
 export function loaderApi<Ctx extends ApiCtx = ApiCtx>({
   schema,

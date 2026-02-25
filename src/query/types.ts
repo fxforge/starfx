@@ -10,22 +10,36 @@ import type {
 
 export type IfAny<T, Y, N> = 0 extends 1 & T ? Y : N;
 
+/**
+ * Context provided to thunk middleware and action handlers.
+ */
 export interface ThunkCtx<P = any> extends Payload<P> {
+  /** Action name string */
   name: string;
+  /** Deterministic key for this invocation */
   key: string;
+  /** The dispatched action */
   action: ActionWithPayload<CreateActionPayload<P>>;
+  /** The action creator function for this thunk */
   actionFn: IfAny<
     P,
     CreateAction<ThunkCtx>,
     CreateActionWithPayload<ThunkCtx<P>, P>
   >;
+  /** Operation result placeholder */
   result: Result<void>;
 }
 
+/**
+ * Thunk context that may be associated with a loader.
+ */
 export interface ThunkCtxWLoader extends ThunkCtx {
   loader: Omit<LoaderPayload, "id"> | null;
 }
 
+/**
+ * Extended thunk context including loader instance state.
+ */
 export interface LoaderCtx<P = unknown> extends ThunkCtx<P> {
   loader: Partial<LoaderItemState> | null;
 }
@@ -46,6 +60,9 @@ export type RequiredApiRequest = {
   headers: HeadersInit;
 } & Partial<RequestInit>;
 
+/**
+ * Context shape used when performing fetch requests.
+ */
 export interface FetchCtx<P = any> extends ThunkCtx<P> {
   request: ApiRequest | null;
   req: (r?: ApiRequest) => RequiredApiRequest;
@@ -61,6 +78,9 @@ export interface FetchJsonCtx<P = any, ApiSuccess = any, ApiError = any>
   extends FetchCtx<P>,
     FetchJson<ApiSuccess, ApiError> {}
 
+/**
+ * Full API context made available to mdw/api and endpoint handlers.
+ */
 export interface ApiCtx<Payload = any, ApiSuccess = any, ApiError = any>
   extends FetchJsonCtx<Payload, ApiSuccess, ApiError> {
   actions: Action[];
@@ -79,6 +99,9 @@ export interface PerfCtx<P = unknown> extends ThunkCtx<P> {
   performance: number;
 }
 
+/**
+ * A middleware function for thunks.
+ */
 export type Middleware<Ctx extends ThunkCtx = ThunkCtx> = (
   ctx: Ctx,
   next: Next,
@@ -87,6 +110,9 @@ export type MiddlewareCo<Ctx extends ThunkCtx = ThunkCtx> =
   | Middleware<Ctx>
   | Middleware<Ctx>[];
 
+/**
+ * Middleware fn type specialized for HTTP API contexts.
+ */
 export type MiddlewareApi<Ctx extends ApiCtx = ApiCtx> = (
   ctx: Ctx,
   next: Next,
@@ -95,6 +121,9 @@ export type MiddlewareApiCo<Ctx extends ApiCtx = ApiCtx> =
   | Middleware<Ctx>
   | Middleware<Ctx>[];
 
+/**
+ * Payload carried with each created action.
+ */
 export interface CreateActionPayload<P = any, ApiSuccess = any> {
   name: string;
   key: string;

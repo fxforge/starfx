@@ -50,6 +50,35 @@ export const ListenersContext = createContext<Set<Listener>>(
   new Set<Listener>(),
 );
 
+/**
+ * Creates a new FxStore instance for managing application state.
+ *
+ * @remarks
+ * The store wraps an Effection scope and provides state management primitives,
+ * listener registration, middleware application, and a `run` helper for
+ * executing operations within the store's scope.
+ *
+ * Unlike traditional Redux stores, this store does not use reducers. Instead,
+ * state updates are performed with immer-based updater functions that mutate
+ * draft state.
+ *
+ * @typeParam O - Slice factory map used to build schema/state shape.
+ * @param options - Store configuration object.
+ * @param options.scope - Optional Effection scope to use.
+ * @param options.schemas - Schema list used to compose initial state.
+ * @returns A fully configured store instance.
+ *
+ * @example
+ * ```ts
+ * const schema = createSchema({
+ *   users: slice.table<User>(),
+ *   cache: slice.table(),
+ *   loaders: slice.loaders(),
+ * });
+ *
+ * const store = createStore({ schemas: [schema] });
+ * ```
+ */
 export function createStore<O extends FxMap>({
   scope: initScope,
   schemas,

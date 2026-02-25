@@ -31,7 +31,16 @@ const tinySimpleHash = (s: string) => {
 };
 
 /**
- * This function used to set `ctx.key`
+ * Create a deterministic key for an action based on its `name` and `payload`.
+ *
+ * @remarks
+ * The payload is deep-sorted and hashed so that semantically equivalent
+ * payload objects produce the same key string. This key is used to identify
+ * loader and cache entries in the store.
+ *
+ * @param name - Action endpoint name (e.g. '/users/:id').
+ * @param payload - Optional payload object used to generate a stable hash.
+ * @returns A string key in the form `name|hash` when payload is provided, otherwise `name`.
  */
 export const createKey = (name: string, payload?: any) => {
   const normJsonString =

@@ -1,3 +1,4 @@
+import type { Immutable } from "immer";
 /**
  * Type tests for slice creation
  *
@@ -5,7 +6,6 @@
  * They don't run at runtime - they verify types at compile time.
  */
 import { describe, expectTypeOf, test } from "vitest";
-import type { Immutable } from "immer";
 import { createSchema, slice } from "../store/index.js";
 import type {
   AnyOutput,

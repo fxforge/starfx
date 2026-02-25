@@ -53,6 +53,22 @@ export function createNum({
   } satisfies NumOutput;
 }
 
+/**
+ * Public numeric slice API used in `createSchema` definitions.
+ *
+ * @remarks
+ * Great for counters, pagination indexes, and lightweight scalar state.
+ *
+ * @param initialState - Optional initial value for the slice.
+ * @returns A factory consumed by `createSchema` with the slice name.
+ *
+ * @example
+ * ```ts
+ * const schema = createSchema({
+ *   counter: slice.num(0),
+ * });
+ * ```
+ */
 export function num(initialState?: number) {
   return (name: string) => createNum({ name, initialState });
 }

@@ -41,6 +41,22 @@ export function createStr({
   } satisfies StrOutput;
 }
 
+/**
+ * Public string slice API used in `createSchema` definitions.
+ *
+ * @remarks
+ * Useful for tokens, identifiers, and lightweight text state.
+ *
+ * @param initialState - Optional initial string value.
+ * @returns A factory consumed by `createSchema` with the slice name.
+ *
+ * @example
+ * ```ts
+ * const schema = createSchema({
+ *   token: slice.str(""),
+ * });
+ * ```
+ */
 export function str(initialState?: string) {
   return (name: string) => createStr({ name, initialState });
 }

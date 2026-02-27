@@ -1,4 +1,4 @@
-import { lift } from "effection";
+import { lift, Operation } from "effection";
 import { type Draft, enablePatches, produceWithPatches } from "immer";
 import { API_ACTION_PREFIX, ActionContext, emit } from "../action.js";
 import { type BaseMiddleware, compose } from "../compose.js";
@@ -57,6 +57,7 @@ export interface CreateSchemaWithUpdaterOptions<S extends AnyState> {
    * This is where you implement your state update logic (e.g., immer, plain objects, etc.)
    */
   updateMdw: BaseMiddleware<UpdaterCtx<S>>;
+  initialize?: () => Operation<void>;
 }
 
 function* logMdw<O extends FxMap>(
@@ -99,7 +100,7 @@ function* notifyListenersMdw<O extends FxMap>(
  * ```ts
  * // Plain object update (no immer)
  * const schema = createSchemaWithUpdater(mySlices, {
- *   createUpdateMdw: (store) => function* (ctx, next) {
+ *   *updateMdw(ctx: UpdaterCtx<SliceFromSchema<O>>, next: Next) {
  *     const updaters = Array.isArray(ctx.updater) ? ctx.updater : [ctx.updater];
  *     let state = store.getState();
  *     for (const updater of updaters) {
@@ -117,6 +118,7 @@ export function createSchemaWithUpdater<O extends FxMap>(
   {
     name = "default",
     middleware = [],
+    initialize,
     updateMdw,
   }: CreateSchemaWithUpdaterOptions<SliceFromSchema<O>>,
 ): FxSchema<O> {
@@ -177,6 +179,7 @@ export function createSchemaWithUpdater<O extends FxMap>(
   const schema = db as FxSchema<O>;
   schema.name = name;
   schema.update = update;
+  schema.initialize = initialize;
   schema.initialState = initialState as SliceFromSchema<O>;
   schema.reset = reset;
 

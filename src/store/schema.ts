@@ -1,4 +1,4 @@
-import { lift, Operation } from "effection";
+import { type Operation, lift } from "effection";
 import { type Draft, enablePatches, produceWithPatches } from "immer";
 import { API_ACTION_PREFIX, ActionContext, emit } from "../action.js";
 import { type BaseMiddleware, compose } from "../compose.js";

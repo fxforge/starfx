@@ -92,6 +92,14 @@ export function createStore<O extends FxMap>({
     scope = tuple[0];
   }
 
+  const listeners = new Set<Listener>();
+  scope.set(ListenersContext, listeners);
+
+  const signal = createSignal<AnyAction, void>();
+  const watch = createReplaySignal<Callable<Operation<void>>, void>();
+  scope.set(ActionContext, signal);
+  scope.set(IdContext, id++);
+
   // Use the first schema as the default
   const schema = schemas[0];
 
@@ -118,14 +126,6 @@ export function createStore<O extends FxMap>({
       watch.send(s.initialize);
     }
   });
-
-  const listeners = new Set<Listener>();
-  scope.set(ListenersContext, listeners);
-
-  const signal = createSignal<AnyAction, void>();
-  const watch = createReplaySignal<Callable<Operation<void>>, void>();
-  scope.set(ActionContext, signal);
-  scope.set(IdContext, id++);
 
   function getScope() {
     return scope;

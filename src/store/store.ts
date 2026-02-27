@@ -1,17 +1,29 @@
 import {
-  Ok,
+  type Callable,
+  type Operation,
   type Scope,
+  type Task,
   createContext,
   createScope,
   createSignal,
+  each,
+  lift,
+  suspend,
 } from "effection";
-import { enablePatches, produceWithPatches } from "immer";
-import { API_ACTION_PREFIX, ActionContext, emit } from "../action.js";
-import { type BaseMiddleware, compose } from "../compose.js";
-import type { AnyAction, AnyState, Next } from "../types.js";
-import { StoreContext, StoreUpdateContext } from "./context.js";
+import { produce } from "immer";
+import { ActionContext, emit } from "../action.js";
+import { createReplaySignal } from "../fx/replay-signal.js";
+import type { AnyAction } from "../types.js";
+import { StoreContext } from "./context.js";
 import { createRun } from "./run.js";
-import type { FxStore, Listener, StoreUpdater, UpdaterCtx } from "./types.js";
+import type {
+  FxMap,
+  FxSchema,
+  FxStore,
+  Listener,
+  SliceFromSchema,
+  UpdaterCtx,
+} from "./types.js";
 const stubMsg = "This is merely a stub, not implemented";
 
 let id = 0;
@@ -28,13 +40,16 @@ function observable() {
   };
 }
 
-export interface CreateStore<S extends AnyState> {
+export interface CreateStore<O extends FxMap> {
   scope?: Scope;
-  initialState: S;
-  middleware?: BaseMiddleware<UpdaterCtx<S>>[];
+  schemas: FxSchema<O>[];
 }
 
 export const IdContext = createContext("starfx:id", 0);
+export const ListenersContext = createContext<Set<Listener>>(
+  "starfx:store:listeners",
+  new Set<Listener>(),
+);
 
 /**
  * Creates a new FxStore instance for managing application state.
@@ -45,47 +60,30 @@ export const IdContext = createContext("starfx:id", 0);
  * executing operations within the store's scope.
  *
  * Unlike traditional Redux stores, this store does not use reducers. Instead,
- * state updates are performed using `immer`-based updater functions that directly
- * mutate a draft state. This design is inspired by the observation that reducers
- * were originally created to ensure immutability, but with `immer` that concern
- * is handled automatically.
+ * state updates are performed with immer-based updater functions that mutate
+ * draft state.
  *
- * @typeParam S - The shape of the root state object.
- *
+ * @typeParam O - Slice factory map used to build schema/state shape.
  * @param options - Store configuration object.
- * @param options.initialState - The initial state for the store.
- * @param options.scope - Optional Effection scope to use. If omitted, a new scope is created.
- * @param options.middleware - Optional array of store middleware.
- * @returns A fully configured {@link FxStore} instance.
- *
- * @see {@link createSchema} for creating the schema and initial state.
- * @see {@link https://immerjs.github.io/immer/update-patterns | Immer update patterns}
+ * @param options.scope - Optional Effection scope to use.
+ * @param options.schemas - Schema list used to compose initial state.
+ * @returns A fully configured store instance.
  *
  * @example
  * ```ts
- * import { createSchema, createStore, slice } from "starfx";
- *
- * interface User {
- *   id: string;
- *   name: string;
- * }
- *
- * const [schema, initialState] = createSchema({
+ * const schema = createSchema({
+ *   users: slice.table<User>(),
  *   cache: slice.table(),
  *   loaders: slice.loaders(),
- *   users: slice.table<User>(),
  * });
  *
- * const store = createStore({ initialState });
- * store.run(api.register);
- * store.dispatch(fetchUsers());
+ * const store = createStore({ schemas: [schema] });
  * ```
  */
-export function createStore<S extends AnyState>({
-  initialState,
+export function createStore<O extends FxMap>({
   scope: initScope,
-  middleware = [],
-}: CreateStore<S>): FxStore<S> {
+  schemas,
+}: CreateStore<O>): FxStore<O> {
   let scope: Scope;
   if (initScope) {
     scope = initScope;
@@ -94,13 +92,40 @@ export function createStore<S extends AnyState>({
     scope = tuple[0];
   }
 
-  let state = initialState;
   const listeners = new Set<Listener>();
-  enablePatches();
+  scope.set(ListenersContext, listeners);
 
   const signal = createSignal<AnyAction, void>();
+  const watch = createReplaySignal<Callable<Operation<void>>, void>();
   scope.set(ActionContext, signal);
   scope.set(IdContext, id++);
+
+  // Use the first schema as the default
+  const schema = schemas[0];
+
+  // Build schemas map by name for selective access
+  const schemasMap = schemas.reduce(
+    (acc, s) => {
+      acc[s.name] = s;
+      return acc;
+    },
+    {} as Record<string, FxSchema<O>>,
+  );
+
+  // Build initial state from all schemas
+  const initialState = schemas.reduce(
+    (acc, schema) => {
+      return Object.assign(acc, schema.initialState);
+    },
+    {} as SliceFromSchema<O>,
+  );
+  let state = initialState;
+
+  schemas.forEach((s) => {
+    if (s.initialize) {
+      watch.send(s.initialize);
+    }
+  });
 
   function getScope() {
     return scope;
@@ -110,120 +135,72 @@ export function createStore<S extends AnyState>({
     return state;
   }
 
-  function subscribe(fn: Listener) {
-    listeners.add(fn);
-    return () => listeners.delete(fn);
-  }
-
-  function* updateMdw(ctx: UpdaterCtx<S>, next: Next) {
-    const upds: StoreUpdater<S>[] = [];
-
-    if (Array.isArray(ctx.updater)) {
-      upds.push(...ctx.updater);
-    } else {
-      upds.push(ctx.updater);
-    }
-
-    const [nextState, patches, _] = produceWithPatches(getState(), (draft) => {
-      // TODO: check for return value inside updater
-      upds.forEach((updater) => updater(draft as any));
+  function setState(newState: SliceFromSchema<O>) {
+    // enables merging multiple states from
+    // different schemas without overwriting the whole state
+    // TODO but this means double produce on the default single schema case
+    state = produce(state, (draft) => {
+      Object.assign(draft, newState);
     });
-    ctx.patches = patches;
-
-    // set the state!
-    state = nextState;
-
-    yield* next();
-  }
-
-  function* logMdw(ctx: UpdaterCtx<S>, next: Next) {
-    dispatch({
-      type: `${API_ACTION_PREFIX}store`,
-      payload: ctx,
-    });
-    yield* next();
-  }
-
-  function* notifyChannelMdw(_: UpdaterCtx<S>, next: Next) {
-    const chan = yield* StoreUpdateContext.expect();
-    yield* chan.send();
-    yield* next();
-  }
-
-  function* notifyListenersMdw(_: UpdaterCtx<S>, next: Next) {
-    listeners.forEach((f) => f());
-    yield* next();
-  }
-
-  function createUpdater() {
-    const fn = compose<UpdaterCtx<S>>([
-      updateMdw,
-      ...middleware,
-      logMdw,
-      notifyChannelMdw,
-      notifyListenersMdw,
-    ]);
-
-    return fn;
-  }
-
-  const mdw = createUpdater();
-  function* update(updater: StoreUpdater<S> | StoreUpdater<S>[]) {
-    const ctx = {
-      updater,
-      patches: [],
-      result: Ok(undefined),
-    };
-
-    yield* mdw(ctx);
-
-    if (!ctx.result.ok) {
-      dispatch({
-        type: `${API_ACTION_PREFIX}store`,
-        payload: ctx.result.error,
-      });
-    }
-
-    return ctx;
-  }
-
-  function dispatch(action: AnyAction | AnyAction[]) {
-    emit({ signal, action });
   }
 
   function getInitialState() {
     return initialState;
   }
 
-  function* reset(ignoreList: (keyof S)[] = []) {
-    return yield* update((s) => {
-      const keep = ignoreList.reduce<S>(
-        (acc, key) => {
-          acc[key] = s[key];
-          return acc;
-        },
-        { ...initialState },
-      );
+  function subscribe(fn: Listener) {
+    listeners.add(fn);
+    return () => listeners.delete(fn);
+  }
 
-      Object.keys(s).forEach((key: keyof S) => {
-        s[key] = keep[key];
+  function dispatch(action: AnyAction | AnyAction[]) {
+    emit({ signal, action });
+  }
+
+  function manage<Resource>(name: string, inputResource: Operation<Resource>) {
+    const CustomContext = createContext<Resource>(name);
+    function* manager() {
+      const providedResource = yield* inputResource;
+      scope.set(CustomContext, providedResource);
+      yield* suspend();
+    }
+    watch.send(manager);
+
+    // returns to the user so they can use this resource from
+    //  anywhere this context is available
+    return CustomContext;
+  }
+
+  const run = createRun(scope);
+
+  function initialize<T>(op: () => Operation<T>): Task<void> {
+    return scope.run(function* (): Operation<void> {
+      yield* scope.spawn(function* () {
+        for (const watched of yield* each(watch)) {
+          yield* scope.spawn(watched);
+          yield* each.next();
+        }
       });
+      yield* op();
     });
   }
 
-  const store: FxStore<S> = {
+  const store: FxStore<O> = {
     getScope,
     getState,
+    setState,
     subscribe,
-    update,
-    reset,
-    run: createRun(scope),
+    initialize,
+    manage,
+    schema,
+    schemas: schemasMap,
+    run,
     // instead of actions relating to store mutation, they
     // refer to pieces of business logic -- that can also mutate state
     dispatch,
     // stubs so `react-redux` is happy
-    replaceReducer<S = any>(
-      _nextReducer: (_s: S, _a: AnyAction) => void,
+    replaceReducer(
+      _nextReducer: (s: SliceFromSchema<O>, a: AnyAction) => SliceFromSchema<O>,
     ): void {
       throw new Error(stubMsg);
     },
@@ -231,11 +208,6 @@ export function createStore<S extends AnyState>({
     [Symbol.observable]: observable,
   };
 
-  scope.set(StoreContext, store as FxStore<AnyState>);
+  scope.set(StoreContext, store as FxStore<FxMap>);
   return store;
 }
-
-/**
- * @deprecated use {@link createStore}
- */
-export const configureStore = createStore;

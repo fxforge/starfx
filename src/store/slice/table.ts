@@ -1,6 +1,12 @@
+import type { Draft, Immutable } from "immer";
 import { createSelector } from "reselect";
-import type { AnyState, IdProp } from "../../types.js";
-import type { BaseSchema } from "../types.js";
+import type { IdProp } from "../../types.js";
+import type { BaseSchema, SliceState } from "../types.js";
+
+type TableData<Entity> = Record<IdProp, Entity>;
+type TableRootState<Entity> = Record<string, TableData<Entity>>;
+type TableState<Entity> = Immutable<TableRootState<Entity>>;
+type TableDraftState<Entity> = Draft<TableRootState<Entity>>;
 
 interface PropId {
   id: IdProp;
@@ -15,269 +21,222 @@ interface PatchEntity<T> {
 }
 
 const excludesFalse = <T>(n?: T): n is T => Boolean(n);
+type EntityOrFactory<Entity> = Entity | (() => Entity);
+const isFactory = <T>(value: T | (() => T)): value is () => T =>
+  typeof value === "function";
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  value !== null && typeof value === "object";
 
-function mustSelectEntity<Entity extends AnyState = AnyState>(
-  defaultEntity: Entity | (() => Entity),
-) {
-  const isFn = typeof defaultEntity === "function";
-
-  return function selectEntity<S extends AnyState = AnyState>(
-    selectById: (s: S, p: PropId) => Entity | undefined,
-  ) {
-    return (state: S, { id }: PropId): Entity => {
-      if (isFn) {
-        const entity = defaultEntity as () => Entity;
-        return selectById(state, { id }) || entity();
-      }
-
-      return selectById(state, { id }) || (defaultEntity as Entity);
-    };
-  };
+export interface TableSelectors<
+  Entity = unknown,
+  Empty extends EntityOrFactory<Entity> = EntityOrFactory<Entity>,
+> {
+  findById: (
+    d: Immutable<TableData<Entity>>,
+    p: PropId,
+  ) => Immutable<Entity> | undefined;
+  findByIds: (
+    d: Immutable<TableData<Entity>>,
+    p: PropIds,
+  ) => Immutable<Entity>[];
+  tableAsList: (d: Immutable<TableData<Entity>>) => Immutable<Entity>[];
+  selectTable: (s: TableState<Entity>) => Immutable<TableData<Entity>>;
+  selectTableAsList: (state: TableState<Entity>) => Immutable<Entity[]>;
+  selectById: (
+    s: TableState<Entity>,
+    p: PropId,
+  ) => Empty extends undefined
+    ? Immutable<Entity> | undefined
+    : Immutable<Entity>;
+  selectByIds: (s: TableState<Entity>, p: PropIds) => Immutable<Entity[]>;
 }
 
 function tableSelectors<
-  Entity extends AnyState = AnyState,
-  S extends AnyState = AnyState,
+  Entity = unknown,
+  Empty extends EntityOrFactory<Entity> | undefined = EntityOrFactory<Entity>,
 >(
-  selectTable: (s: S) => Record<IdProp, Entity>,
-  empty?: Entity | (() => Entity) | undefined,
+  selectTable: (s: TableState<Entity>) => Immutable<TableData<Entity>>,
+  empty: Empty,
 ) {
-  const must = empty ? mustSelectEntity(empty) : null;
-  const tableAsList = (data: Record<IdProp, Entity>): Entity[] =>
-    Object.values(data).filter(excludesFalse);
-  const findById = (data: Record<IdProp, Entity>, { id }: PropId) => data[id];
-  const findByIds = (
-    data: Record<IdProp, Entity>,
-    { ids }: PropIds,
-  ): Entity[] => ids.map((id) => data[id]).filter(excludesFalse);
-  const selectById = (
-    state: S,
-    { id }: PropId,
-  ): typeof empty extends undefined ? Entity | undefined : Entity => {
+  const tableAsList = ((data) =>
+    Object.values(data).filter(
+      excludesFalse,
+    )) satisfies TableSelectors<Entity>["tableAsList"];
+  const findById = ((data, { id }) =>
+    data[id]) satisfies TableSelectors<Entity>["findById"];
+  const findByIds = ((data, { ids }) =>
+    ids
+      .map((id) => data[id])
+      .filter(excludesFalse)) satisfies TableSelectors<Entity>["findByIds"];
+
+  const selectById = ((state, { id }) => {
     const data = selectTable(state);
     return findById(data, { id });
-  };
-
-  const sbi = must ? must(selectById) : selectById;
+  }) satisfies TableSelectors<Entity>["selectById"];
 
   return {
-    findById: must ? must(findById) : findById,
+    findById,
     findByIds,
     tableAsList,
     selectTable,
-    selectTableAsList: createSelector(selectTable, (data): Entity[] =>
-      tableAsList(data),
-    ),
-    selectById: sbi,
+    selectTableAsList: createSelector(selectTable, (data) => tableAsList(data)),
+    selectById: !empty
+      ? selectById
+      : (state, { id }) => {
+          if (isFactory(empty)) {
+            return selectById(state, { id }) || (empty() as Immutable<Entity>);
+          }
+          return selectById(state, { id }) || (empty as Immutable<Entity>);
+        },
     selectByIds: createSelector(
       selectTable,
-      (_: S, p: PropIds) => p.ids,
+      (_, p: PropIds) => p.ids,
       (data, ids) => findByIds(data, { ids }),
     ),
-  };
+  } satisfies TableSelectors<Entity>;
 }
 
-export interface TableOutput<
-  Entity extends AnyState,
-  S extends AnyState,
-  Empty extends Entity | undefined = Entity | undefined,
-> extends BaseSchema<Record<IdProp, Entity>> {
+export interface TableActions<Entity = unknown> {
+  // actions operate on Draft<TableRootState>
+  add: (e: SliceState<Entity>) => (s: TableDraftState<Entity>) => void;
+  set: (e: SliceState<Entity>) => (s: TableDraftState<Entity>) => void;
+  remove: (ids: IdProp[]) => (s: TableDraftState<Entity>) => void;
+  patch: (
+    e: PatchEntity<SliceState<Entity>>,
+  ) => (s: TableDraftState<Entity>) => void;
+  merge: (
+    e: PatchEntity<SliceState<Entity>>,
+  ) => (s: TableDraftState<Entity>) => void;
+  reset: () => (s: TableDraftState<Entity>) => void;
+}
+
+export interface TableOutput<Entity = unknown>
+  extends BaseSchema<Record<IdProp, Entity>>,
+    TableActions<Entity>,
+    TableSelectors<Entity> {
   schema: "table";
+  /** runtime initial state for the table slice */
   initialState: Record<IdProp, Entity>;
-  empty: Empty;
-  add: (e: Record<IdProp, Entity>) => (s: S) => void;
-  set: (e: Record<IdProp, Entity>) => (s: S) => void;
-  remove: (ids: IdProp[]) => (s: S) => void;
-  patch: (e: PatchEntity<Record<IdProp, Entity>>) => (s: S) => void;
-  merge: (e: PatchEntity<Record<IdProp, Entity>>) => (s: S) => void;
-  reset: () => (s: S) => void;
-  findById: (d: Record<IdProp, Entity>, { id }: PropId) => Empty;
-  findByIds: (d: Record<IdProp, Entity>, { ids }: PropIds) => Entity[];
-  tableAsList: (d: Record<IdProp, Entity>) => Entity[];
-  selectTable: (s: S) => Record<IdProp, Entity>;
-  selectTableAsList: (state: S) => Entity[];
-  selectById: (s: S, p: PropId) => Empty;
-  selectByIds: (s: S, p: PropIds) => Entity[];
+  /** default/empty entity value (or factory) */
+  empty: Entity | undefined;
 }
 
-/**
- * Create a table-style slice for entity storage (id -> entity map).
- *
- * @remarks
- * The table slice mimics a database table where entities are stored in a
- * `Record<Id, Entity>` structure. It provides:
- *
- * **Selectors:**
- * - `selectTable` - Get the entire table object
- * - `selectTableAsList` - Get all entities as an array
- * - `selectById` - Get single entity by id (returns `empty` if not found)
- * - `selectByIds` - Get multiple entities by ids
- *
- * **Updaters:**
- * - `add` - Add or replace entities
- * - `set` - Replace entire table
- * - `remove` - Remove entities by ids
- * - `patch` - Partially update entities
- * - `merge` - Deep merge entities
- * - `reset` - Reset to initial state
- *
- * **Empty value:**
- * When `empty` is provided and `selectById` doesn't find an entity, it returns
- * the empty value instead of `undefined`. This promotes safer code by providing
- * stable assumptions about data shape (no optional chaining needed).
- *
- * @typeParam Entity - The entity type stored in the table.
- * @typeParam S - The root state type.
- * @param p - Table configuration.
- * @param p.name - The state key for this table.
- * @param p.initialState - Optional initial map of entities.
- * @param p.empty - Optional empty entity (or factory) returned for missing lookups.
- * @returns A {@link TableOutput} with selectors and mutation helpers.
- *
- * @see {@link https://bower.sh/death-by-thousand-existential-checks | Why empty values matter}
- * @see {@link https://bower.sh/entity-factories | Entity factories pattern}
- *
- * @example Basic usage
- * ```ts
- * interface User {
- *   id: string;
- *   name: string;
- *   email: string;
- * }
- *
- * const [schema, initialState] = createSchema({
- *   users: slice.table<User>({ empty: { id: '', name: '', email: '' } }),
- * });
- *
- * // Add users
- * yield* schema.update(
- *   schema.users.add({
- *     '1': { id: '1', name: 'Alice', email: 'alice@example.com' },
- *     '2': { id: '2', name: 'Bob', email: 'bob@example.com' },
- *   })
- * );
- *
- * // Get user (returns empty if not found)
- * const user = yield* select(schema.users.selectById, { id: '1' });
- *
- * // Partial update
- * yield* schema.update(
- *   schema.users.patch({ '1': { name: 'Alice Smith' } })
- * );
- *
- * // Remove users
- * yield* schema.update(schema.users.remove(['2']));
- * ```
- */
-export function createTable<
-  Entity extends AnyState = AnyState,
-  S extends AnyState = AnyState,
->(p: {
-  name: keyof S;
-  initialState?: Record<IdProp, Entity>;
-  empty: Entity | (() => Entity);
-}): TableOutput<Entity, S, Entity>;
-export function createTable<
-  Entity extends AnyState = AnyState,
-  S extends AnyState = AnyState,
->(p: {
-  name: keyof S;
-  initialState?: Record<IdProp, Entity>;
-  empty?: Entity | (() => Entity);
-}): TableOutput<Entity, S, Entity | undefined>;
-export function createTable<
-  Entity extends AnyState = AnyState,
-  S extends AnyState = AnyState,
->({
+export function createTable<Entity = unknown>({
   name,
   empty,
-  initialState = {},
+  initialState,
 }: {
-  name: keyof S;
+  name: keyof TableRootState<Entity>;
   initialState?: Record<IdProp, Entity>;
   empty?: Entity | (() => Entity);
-}): TableOutput<Entity, S, Entity | undefined> {
-  const selectors = tableSelectors<Entity, S>((s: S) => s[name], empty);
+}): TableOutput<Entity> {
+  const tableInitialState: TableData<Entity> = initialState ?? {};
+  const selectors = tableSelectors<Entity, typeof empty>((s) => s[name], empty);
 
-  return {
+  const output = {
     schema: "table",
-    name: name as string,
-    initialState,
-    empty: typeof empty === "function" ? empty() : empty,
+    name,
+    initialState: tableInitialState,
+    empty: empty === undefined ? undefined : isFactory(empty) ? empty() : empty,
     add: (entities) => (s) => {
-      const state = selectors.selectTable(s);
-      Object.keys(entities).forEach((id) => {
-        state[id] = entities[id];
-      });
+      const state = s[name];
+      Object.assign(state, entities);
     },
-
     set: (entities) => (s) => {
-      (s as any)[name] = entities;
+      const state = s[name];
+      // replace table contents in-place
+      for (const k of Object.keys(state)) delete state[k];
+      Object.assign(state, entities);
     },
     remove: (ids) => (s) => {
-      const state = selectors.selectTable(s);
-      ids.forEach((id) => {
-        delete state[id];
-      });
+      const state = s[name];
+      for (const id of ids) delete state[id];
     },
     patch: (entities) => (s) => {
-      const state = selectors.selectTable(s);
-      Object.keys(entities).forEach((id) => {
-        state[id] = { ...state[id], ...entities[id] };
-      });
+      const state = s[name];
+      for (const id of Object.keys(entities)) {
+        const existing = state[id];
+        const patch = entities[id];
+        if (existing && typeof existing === "object") {
+          Object.assign(existing, patch);
+        }
+      }
     },
     merge: (entities) => (s) => {
-      const state = selectors.selectTable(s);
-      Object.keys(entities).forEach((id) => {
-        const entity = entities[id];
-        Object.keys(entity).forEach((prop) => {
-          const val = entity[prop];
+      const state = s[name];
+      for (const id of Object.keys(entities)) {
+        const src = entities[id];
+        if (!src) continue;
+        const srcRec: Record<string, unknown> = isRecord(src) ? src : {};
+        const current = state[id];
+        const tgtRec: Record<string, unknown> = isRecord(current)
+          ? current
+          : {};
+        for (const prop of Object.keys(srcRec)) {
+          const val = srcRec[prop];
           if (Array.isArray(val)) {
-            const list = val as any[];
-            (state as any)[id][prop].push(...list);
+            const arr = Array.isArray(tgtRec[prop]) ? tgtRec[prop] : [];
+            tgtRec[prop] = [...arr, ...val];
           } else {
-            (state as any)[id][prop] = entities[id][prop];
+            tgtRec[prop] = val;
           }
-        });
-      });
+        }
+        Object.assign(state, { [id]: tgtRec });
+      }
     },
     reset: () => (s) => {
-      (s as any)[name] = initialState;
+      const state = s[name];
+      for (const k of Object.keys(state)) delete state[k];
+      Object.assign(state, tableInitialState);
     },
     ...selectors,
-  };
+  } satisfies TableOutput<Entity>;
+
+  return output;
 }
 
-export function table<
-  Entity extends AnyState = AnyState,
-  S extends AnyState = AnyState,
->(p: {
-  initialState?: Record<IdProp, Entity>;
-  empty: Entity | (() => Entity);
-}): (n: string) => TableOutput<Entity, S, Entity>;
-export function table<
-  Entity extends AnyState = AnyState,
-  S extends AnyState = AnyState,
->(p?: {
-  initialState?: Record<IdProp, Entity>;
-  empty?: Entity | (() => Entity);
-}): (n: string) => TableOutput<Entity, S, Entity | undefined>;
 /**
- * Shortcut for defining a `table` slice when building schema declarations.
+ * Public table slice API used in `createSchema` definitions.
  *
- * @param initialState - Optional initial entity map.
- * @param empty - Optional empty entity or factory.
- * @returns A factory function accepting the slice name.
+ * @remarks
+ * The table slice mimics a normalized entity table with `id -> entity` storage.
+ *
+ * Available selectors:
+ * - `selectTable`
+ * - `selectTableAsList`
+ * - `selectById`
+ * - `selectByIds`
+ *
+ * Available updaters:
+ * - `add`
+ * - `set`
+ * - `remove`
+ * - `patch`
+ * - `merge`
+ * - `reset`
+ *
+ * If `empty` is provided and `selectById` misses, the selector returns that
+ * value instead of `undefined`.
+ *
+ * @param options.initialState - Optional initial entity map.
+ * @param options.empty - Optional empty entity or factory.
+ * @returns A factory consumed by `createSchema` with the slice name.
+ *
+ * @example
+ * ```ts
+ * const schema = createSchema({
+ *   users: slice.table<User>({
+ *     empty: { id: "", name: "" },
+ *   }),
+ * });
+ * ```
  */
-export function table<
-  Entity extends AnyState = AnyState,
-  S extends AnyState = AnyState,
->({
-  initialState,
-  empty,
-}: {
-  initialState?: Record<IdProp, Entity>;
-  empty?: Entity | (() => Entity);
-} = {}): (n: string) => TableOutput<Entity, S, Entity | undefined> {
+export function table<Entity = unknown>(
+  options: {
+    initialState?: Record<IdProp, Entity>;
+    empty?: Entity | (() => Entity);
+  } = {},
+): (n: string) => TableOutput<Entity> {
+  const { initialState, empty } = options;
   return (name: string) => createTable<Entity>({ name, empty, initialState });
 }

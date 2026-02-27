@@ -3,151 +3,46 @@ import { getIdFromAction, take } from "../action.js";
 import { parallel, safe } from "../fx/index.js";
 import type { ThunkAction } from "../query/index.js";
 import type { ActionFnWithPayload, AnyState, LoaderState } from "../types.js";
-import { StoreContext } from "./context.js";
+import { expectStore } from "./context.js";
 import type { LoaderOutput } from "./slice/loaders.js";
-import type { FxStore, StoreUpdater, UpdaterCtx } from "./types.js";
+import type {
+  FxMap,
+  SliceFromSchema,
+  StoreUpdater,
+  UpdaterCtx,
+} from "./types.js";
 
 /**
- * Apply a store updater within the current store context.
- *
- * @remarks
- * This is one of three ways to update state in starfx. The recommended approach
- * is to use `schema.update()` which provides full type safety. This function is
- * more generic and requires manual type annotation.
- *
- * Updater functions receive an `immer` draft and can mutate it directly.
- * Any mutations are captured and applied immutably to the real state.
- *
- * @typeParam S - Root state shape.
- * @param updater - Updater function or array of updaters to apply.
- * @returns The update context produced by the store.
- *
- * @see {@link https://immerjs.github.io/immer/update-patterns | Immer update patterns}
- *
- * @example Basic counter increment
- * ```ts
- * function* inc() {
- *   yield* updateStore((state) => {
- *     state.counter += 1;
- *   });
- * }
- * ```
- *
- * @example Using schema updater helpers
- * ```ts
- * function* addUser(user: User) {
- *   yield* updateStore(schema.users.add({ [user.id]: user }));
- * }
- * ```
- *
- * @example Batch multiple updates
- * ```ts
- * yield* updateStore([
- *   schema.users.add({ [user.id]: user }),
- *   schema.loaders.success({ id: 'fetch-user' }),
- * ]);
- * ```
+ * Updates the store using the default schema's update method.
+ * For multiple schemas, use `store.schemas[name].update()` directly.
  */
 export function* updateStore<S extends AnyState>(
   updater: StoreUpdater<S> | StoreUpdater<S>[],
 ): Operation<UpdaterCtx<S>> {
-  const store = yield* StoreContext.expect();
-  // had to cast the store since StoreContext has a generic store type
-  const st = store as FxStore<S>;
-  const ctx = yield* st.update(updater);
-  return ctx;
+  const store = yield* expectStore<FxMap>();
+  const ctx = yield* store.schema.update(
+    updater as
+      | StoreUpdater<SliceFromSchema<FxMap>>
+      | StoreUpdater<SliceFromSchema<FxMap>>[],
+  );
+  return ctx as UpdaterCtx<S>;
 }
 
-/**
- * Evaluate a selector against the current store state.
- *
- * @remarks
- * Selectors are functions that derive data from the store state. They encapsulate
- * logic for looking up specific values and can be memoized using `createSelector`
- * from reselect (re-exported by starfx).
- *
- * This is an Operation that must be yielded inside an Effection scope (typically a thunk/api).
- *
- * @typeParam S - The state shape.
- * @typeParam R - The return type of the selector.
- * @typeParam P - Optional parameter type for parameterized selectors.
- * @param selectorFn - Selector function to evaluate.
- * @param p - Optional parameter passed to the selector.
- * @returns The result of calling the selector with current state.
- *
- * @see {@link createSelector} for memoized selectors.
- *
- * @example Basic selector usage
- * ```ts
- * // return an array of users
- * const users = yield* select(schema.users.selectTableAsList);
- * ```
- *
- * @example Parameterized selector
- * ```ts
- * // return a single user by id
- * const user = yield* select(schema.users.selectById, { id: '1' });
- * ```
- *
- * @example With custom selector
- * ```ts
- * const selectActiveUsers = createSelector(
- *   schema.users.selectTableAsList,
- *   (users) => users.filter(u => u.isActive)
- * );
- * const activeUsers = yield* select(selectActiveUsers);
- * ```
- */
-export function select<S, R>(selectorFn: (s: S) => R): Operation<R>;
-export function select<S, R, P>(
-  selectorFn: (s: S, p: P) => R,
-  p: P,
-): Operation<R>;
-export function* select<S, R, P>(
-  selectorFn: (s: S, p?: P) => R,
-  p?: P,
+export function* select<S, Args extends unknown[], R>(
+  selectorFn: (s: S, ...args: Args) => R,
+  ...args: Args
 ): Operation<R> {
-  const store = yield* StoreContext.expect();
-  return selectorFn(store.getState() as S, p);
+  const store = yield* expectStore<FxMap>();
+  return selectorFn(store.getState() as S, ...args);
 }
 
-/**
- * Wait for a loader associated with `action` to enter a terminal state
- * (`success` or `error`).
- *
- * @remarks
- * Loaders are "status trackers" that monitor the lifecycle of thunks and
- * endpoints. They track loading, success, and error states along with
- * timestamps and optional metadata.
- *
- * This function polls the loader state on every action until it reaches
- * a terminal state (success or error).
- *
- * @typeParam M - The loader metadata shape.
- * @param loaders - The loader slice instance from your schema.
- * @param action - The action or action-creator which identifies the loader.
- * @returns The final {@link LoaderState} with helper booleans (`isSuccess`, `isError`, etc.).
- *
- * @see {@link waitForLoaders} for waiting on multiple loaders.
- * @see {@link LoaderState} for the shape of the returned state.
- *
- * @example
- * ```ts
- * // wait until the loader for `fetchUsers()` completes
- * const loader = yield* waitForLoader(schema.loaders, fetchUsers());
- * if (loader.isSuccess) {
- *   console.log('Users fetched successfully');
- * } else if (loader.isError) {
- *   console.error('Failed:', loader.message);
- * }
- * ```
- */
-export function* waitForLoader<M extends AnyState>(
-  loaders: LoaderOutput<M, AnyState>,
-  action: ThunkAction | ActionFnWithPayload,
-): Operation<LoaderState<M>> {
+export function* waitForLoader(
+  loaders: LoaderOutput,
+  action: ThunkAction | ActionFnWithPayload<unknown>,
+): Operation<LoaderState> {
   const id = getIdFromAction(action);
-  const selector = (s: AnyState) => loaders.selectById(s, { id });
+  const selector = (s: Parameters<typeof loaders.selectById>[0]) =>
+    loaders.selectById(s, { id });
 
   // check for done state on init
   let loader = yield* select(selector);
@@ -164,46 +59,16 @@ export function* waitForLoader<M extends AnyState>(
   }
 }
 
-/**
- * Wait for multiple loaders associated with `actions` to reach a terminal state.
- *
- * @example
- * ```ts
- * const results = yield* waitForLoaders(schema.loaders, [fetchUser(), fetchPosts()]);
- * for (const res of results) {
- *   if (res.ok) {
- *     // res.value is a LoaderState
- *   }
- * }
- * ```
- */
-export function* waitForLoaders<M extends AnyState>(
-  loaders: LoaderOutput<M, AnyState>,
-  actions: (ThunkAction | ActionFnWithPayload)[],
-): Operation<Result<LoaderState<M>>[]> {
+export function* waitForLoaders(
+  loaders: LoaderOutput,
+  actions: (ThunkAction | ActionFnWithPayload<unknown>)[],
+): Operation<Result<LoaderState>[]> {
   const ops = actions.map((action) => () => waitForLoader(loaders, action));
-  const group = yield* parallel<LoaderState<M>>(ops);
+  const group = yield* parallel<LoaderState>(ops);
   return yield* group;
 }
 
-/**
- * Produce a helper that wraps an operation with loader start/success/error updates.
- *
- * @param loader - Loader slice instance used to mark start/success/error.
- *
- * @example
- * ```ts
- * const track = createTracker(schema.loaders);
- * const trackedOp = track('my-id')(function* () {
- *   return yield* safe(() => someAsyncOp());
- * });
- * const result = yield* trackedOp;
- * if (result.ok) { // result.value is the operation Result }
- * ```
- */
-export function createTracker<T, M extends Record<string, unknown>>(
-  loader: LoaderOutput<M, AnyState>,
-) {
+export function createTracker<T>(loader: LoaderOutput) {
   return (id: string) => {
     return function* (
       op: () => Operation<Result<T>>,

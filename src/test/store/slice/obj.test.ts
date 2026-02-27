@@ -1,4 +1,5 @@
-import { configureStore, updateStore } from "../../../store/index.js";
+import { createStore, updateStore } from "../../../store/index.js";
+import { createSchema } from "../../../store/schema.js";
 import { expect, test } from "../../../test.js";
 
 import { createObj } from "../../../store/slice/obj.js";
@@ -24,13 +25,14 @@ const slice = createObj<ICurrentUser>({
 });
 
 test("sets up an obj", async () => {
-  const store = configureStore({
-    initialState: {
-      [NAME]: crtInitialState,
-    },
+  const schema = createSchema({
+    [NAME]: () => slice,
+  });
+  const store = createStore({
+    schemas: [schema],
   });
 
-  await store.run(function* () {
+  await store.initialize(function* () {
     yield* updateStore(
       slice.set({
         username: "bob",
@@ -48,7 +50,7 @@ test("sets up an obj", async () => {
     roles: ["admin", "user"],
   });
 
-  await store.run(function* () {
+  await store.initialize(function* () {
     yield* updateStore(slice.update({ key: "username", value: "alice" }));
   });
 
@@ -59,7 +61,7 @@ test("sets up an obj", async () => {
     roles: ["admin", "user"],
   });
 
-  await store.run(function* () {
+  await store.initialize(function* () {
     yield* updateStore(
       slice.update({ key: "roles", value: ["admin", "superuser"] }),
     );

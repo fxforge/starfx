@@ -1,6 +1,6 @@
 import type { AnyAction } from "../index.js";
 import { put, sleep, spawn, take } from "../index.js";
-import { createStore } from "../store/index.js";
+import { createSchema, createStore } from "../store/index.js";
 import { expect, test } from "../test.js";
 
 test("a put should complete before more `take` are added and then consumed automatically", async () => {
@@ -22,7 +22,7 @@ test("a put should complete before more `take` are added and then consumed autom
     actual.push(yield* take("action-1"));
   }
 
-  const store = createStore({ initialState: {} });
+  const store = createStore({ schemas: [createSchema()] });
   await store.run(root);
 
   expect(actual).toEqual([
@@ -94,7 +94,7 @@ test("take from default channel", async () => {
     yield* takes; // wait for the takes to complete
   }
 
-  const store = createStore({ initialState: {} });
+  const store = createStore({ schemas: [createSchema()] });
   await store.run(genFn);
 
   const expected = [

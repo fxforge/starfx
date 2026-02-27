@@ -1,26 +1,28 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
-import { createStore, take } from "starfx";
 import { Provider } from "starfx/react";
-import { api, schema } from "./api.ts";
-import App from "./App.tsx";
+import { createStore, take } from "starfx";
+import { thunks, schema } from "./thunks.js";
+import App from "./App.js";
 import "./index.css";
 
 init();
 
 function init() {
-  const store = createStore({ schemas: [schema] });
+  const store = createStore({
+    schemas: [schema],
+  });
   // makes `fx` available in devtools
   (window as any).fx = store;
 
-  store.run([
+  store.initialize([
     function* logger() {
       while (true) {
         const action = yield* take("*");
         console.log("action", action);
       }
     },
-    api.register,
+    thunks.register,
   ]);
 
   ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(

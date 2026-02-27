@@ -1,5 +1,5 @@
 import { call } from "../index.js";
-import { createStore, select } from "../store/index.js";
+import { createSchema, createStore, select, slice } from "../store/index.js";
 import { expect, test } from "../test.js";
 
 interface TestState {
@@ -8,7 +8,9 @@ interface TestState {
 
 test("should be able to grab values from store", async () => {
   let actual;
-  const store = createStore({ initialState: { user: { id: "1" } } });
+  const store = createStore({
+    schemas: [createSchema({ user: slice.obj({ id: "1" }) })],
+  });
   await store.run(function* () {
     actual = yield* select((s: TestState) => s.user);
   });
@@ -17,7 +19,9 @@ test("should be able to grab values from store", async () => {
 
 test("should be able to grab store from a nested call", async () => {
   let actual;
-  const store = createStore({ initialState: { user: { id: "2" } } });
+  const store = createStore({
+    schemas: [createSchema({ user: slice.obj({ id: "2" }) })],
+  });
   await store.run(function* () {
     actual = yield* call(function* () {
       return yield* select((s: TestState) => s.user);

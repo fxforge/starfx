@@ -12,14 +12,14 @@ interface UserWithRoles extends User {
 const emptyUser = { id: "", name: "" };
 
 test("default schema", async () => {
-  const [schema, initialState] = createSchema();
-  const store = createStore({ initialState });
+  const schema = createSchema();
+  const store = createStore({ schemas: [schema] });
   expect(store.getState()).toEqual({
     cache: {},
     loaders: {},
   });
 
-  await store.run(function* () {
+  await store.initialize(function* () {
     yield* schema.update(schema.loaders.start({ id: "1" }));
     yield* schema.update(schema.cache.add({ "1": true }));
   });
@@ -35,7 +35,7 @@ test("default schema", async () => {
 
 test("general types and functionality", async () => {
   expect.assertions(8);
-  const [db, initialState] = createSchema({
+  const db = createSchema({
     users: slice.table<User>({
       initialState: { "1": { id: "1", name: "wow" } },
       empty: emptyUser,
@@ -47,7 +47,7 @@ test("general types and functionality", async () => {
     cache: slice.table({ empty: {} }),
     loaders: slice.loaders(),
   });
-  const store = createStore({ initialState });
+  const store = createStore({ schemas: [db] });
 
   expect(store.getState()).toEqual({
     users: { "1": { id: "1", name: "wow" } },
@@ -61,7 +61,7 @@ test("general types and functionality", async () => {
   const userMap = db.users.selectTable(store.getState());
   expect(userMap).toEqual({ "1": { id: "1", name: "wow" } });
 
-  await store.run(function* () {
+  await store.initialize(function* () {
     yield* db.update([
       db.users.add({ "2": { id: "2", name: "bob" } }),
       db.users.patch({ "1": { name: "zzz" } }),
@@ -93,13 +93,13 @@ test("general types and functionality", async () => {
 
 test("can work with a nested object", async () => {
   expect.assertions(3);
-  const [db, initialState] = createSchema({
+  const db = createSchema({
     currentUser: slice.obj<UserWithRoles>({ id: "", name: "", roles: [] }),
     cache: slice.table({ empty: {} }),
     loaders: slice.loaders(),
   });
-  const store = createStore({ initialState });
-  await store.run(function* () {
+  const store = createStore({ schemas: [db] });
+  await store.initialize(function* () {
     yield* db.update(db.currentUser.update({ key: "name", value: "vvv" }));
     const curUser = yield* select(db.currentUser.select);
     expect(curUser).toEqual({ id: "", name: "vvv", roles: [] });

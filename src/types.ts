@@ -5,17 +5,7 @@ import type { Operation } from "effection";
  *
  * @remarks
  * Call `yield* next()` to pass control to the next middleware. Code after
- * the yield point executes after all downstream middleware have completed.
- * Not calling `next()` exits the middleware stack early.
- *
- * @example
- * ```ts
- * function* myMiddleware(ctx, next) {
- *   console.log('before');
- *   yield* next();  // Call next middleware
- *   console.log('after');
- * }
- * ```
+ * the yield point executes after downstream middleware completes.
  */
 export type Next = () => Operation<void>;
 
@@ -30,17 +20,13 @@ export type IdProp = string | number;
 export type LoadingStatus = "loading" | "success" | "error" | "idle";
 
 /**
- * Minimal state tracked for each loader instance (internal representation).
+ * Minimal state tracked for each loader instance.
  *
  * @remarks
- * This is the raw state stored in the loaders slice. For consumer-facing
- * state with convenience booleans, see {@link LoaderState}.
- *
- * @typeParam M - Shape of the `meta` object for custom metadata.
+ * This is the raw state stored in the loader table. For a consumer-facing
+ * shape with convenience booleans, see {@link LoaderState}.
  */
-export interface LoaderItemState<
-  M extends Record<string, unknown> = Record<IdProp, unknown>,
-> {
+export interface LoaderItemState {
   /** Unique loader id derived from action key/payload */
   id: string;
   /** Current loader status */
@@ -52,29 +38,22 @@ export interface LoaderItemState<
   /** Timestamp of the last successful run */
   lastSuccess: number;
   /** Arbitrary metadata attached to the loader */
-  meta: M;
+  // biome-ignore lint/suspicious/noExplicitAny: allow anything but can't be generic per this type
+  meta: Record<string, any>;
 }
 
 /**
  * Extended loader state with convenience boolean properties.
  *
  * @remarks
- * This is the type returned by loader selectors and hooks. It extends
- * {@link LoaderItemState} with computed booleans for easy status checking:
- *
- * - `isIdle` - Initial state, operation hasn't started
- * - `isLoading` - Currently executing
- * - `isSuccess` - Completed successfully
- * - `isError` - Failed with an error
- * - `isInitialLoading` - Loading AND has never succeeded before
- *
- * The `isInitialLoading` property is useful for showing loading UI only
- * on the first fetch, while displaying stale data during refreshes.
- *
- * @typeParam M - Shape of the `meta` object for custom metadata.
+ * Adds computed booleans for easy status checks:
+ * - `isIdle`
+ * - `isLoading`
+ * - `isSuccess`
+ * - `isError`
+ * - `isInitialLoading`
  */
-export interface LoaderState<M extends AnyState = AnyState>
-  extends LoaderItemState<M> {
+export interface LoaderState extends LoaderItemState {
   isIdle: boolean;
   isLoading: boolean;
   isError: boolean;
@@ -82,28 +61,26 @@ export interface LoaderState<M extends AnyState = AnyState>
   isInitialLoading: boolean;
 }
 
-export type LoaderPayload<M extends AnyState> = Pick<LoaderItemState<M>, "id"> &
-  Partial<Pick<LoaderItemState<M>, "message" | "meta">>;
+export type LoaderPayload = Pick<LoaderItemState, "id"> &
+  Partial<Pick<LoaderItemState, "message" | "meta">>;
 
+// this type is too broad, do not use it. Likely to be removed in the future.
 export type AnyState = Record<string, any>;
 
-export interface Payload<P = any> {
-  payload: P;
+export interface Payload<PayloadContent> {
+  payload: PayloadContent;
 }
 
 /**
  * Basic action shape used throughout the library.
  *
  * @remarks
- * Actions are plain objects with a `type` string that identifies the action.
- * This follows the Flux Standard Action pattern.
- *
- * @see {@link AnyAction} for actions with optional payload/meta.
- * @see {@link ActionWithPayload} for actions with typed payload.
+ * Actions are plain objects with a `type` string that identifies behavior.
  */
 export interface Action {
   /** Action type string */
   type: string;
+  // biome-ignore lint/suspicious/noExplicitAny: allow anything from the user
   [extraProps: string]: any;
 }
 
@@ -115,33 +92,30 @@ export type ActionFn = () => { toString: () => string };
 /**
  * An action creator that accepts a payload.
  */
-export type ActionFnWithPayload<P = any> = (p: P) => { toString: () => string };
+export type ActionFnWithPayload<PayloadContent = unknown> = (
+  p: PayloadContent,
+) => {
+  toString: () => string;
+};
 
 // https://github.com/redux-utilities/flux-standard-action
 /**
  * Flux Standard Action (FSA) compatible action type.
  *
  * @remarks
- * Extends {@link Action} with optional FSA properties:
- * - `payload` - The action's data payload
- * - `meta` - Additional metadata
- * - `error` - If true, `payload` is an Error object
- *
- * While not strictly required, keeping actions JSON serializable is
- * highly recommended for debugging and time-travel features.
- *
- * @see {@link https://github.com/redux-utilities/flux-standard-action | FSA Spec}
+ * Extends {@link Action} with optional payload/meta/error fields.
  */
 export interface AnyAction extends Action {
+  // biome-ignore lint/suspicious/noExplicitAny: : allow anything from the user, but also define type with generic payload
   payload?: any;
-  meta?: any;
+  // biome-ignore lint/suspicious/noExplicitAny: : allow anything from the user
+  meta?: Record<string, any>;
   error?: boolean;
-  [extraProps: string]: any;
 }
 
 /**
  * AnyAction with an explicitly typed `payload`.
  */
-export interface ActionWithPayload<P> extends AnyAction {
-  payload: P;
+export interface ActionWithPayload<PayloadContent> extends AnyAction {
+  payload: PayloadContent;
 }

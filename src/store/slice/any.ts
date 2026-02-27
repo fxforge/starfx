@@ -1,49 +1,71 @@
-import type { AnyState } from "../../types.js";
-import type { BaseSchema } from "../types.js";
+import type { Draft, Immutable } from "immer";
+import type { BaseSchema, SliceState } from "../types.js";
 
-export interface AnyOutput<V, S extends AnyState> extends BaseSchema<V> {
-  schema: "any";
-  initialState: V;
-  set: (v: V) => (s: S) => void;
-  reset: () => (s: S) => void;
-  select: (s: S) => V;
+type AnyRootState<V> = SliceState<V>;
+
+export interface AnyActions<V = unknown> {
+  set: (v: V) => (s: Draft<AnyRootState<V>>) => void;
+  reset: () => (s: Draft<AnyRootState<V>>) => void;
 }
 
-/**
- * Create a generic slice for any arbitrary value.
- *
- * @param name - The state key for this slice.
- * @param initialState - The initial value for the slice.
- * @returns An `AnyOutput` providing setter, reset, and selector helpers.
- */
-export function createAny<V, S extends AnyState = AnyState>({
+export interface AnySelectors<V = unknown> {
+  select: (s: AnyRootState<V>) => Immutable<V>;
+}
+
+// export interface AnyOutput<V, S extends AnyState> extends BaseSchema<V> {
+//   schema: "any";
+//   initialState: V;
+//   set: (v: V) => (s: S) => void;
+//   reset: () => (s: S) => void;
+//   select: (s: S) => V;
+// }
+
+export interface AnyOutput<V = unknown>
+  extends BaseSchema<V>,
+    AnyActions<V>,
+    AnySelectors<V> {
+  schema: "any";
+  initialState: V;
+}
+
+export function createAny<V>({
   name,
   initialState,
 }: {
-  name: keyof S;
+  name: keyof AnyRootState<V>;
   initialState: V;
-}): AnyOutput<V, S> {
+}): AnyOutput<V> {
   return {
     schema: "any",
-    name: name as string,
+    name: String(name),
     initialState,
     set: (value) => (state) => {
-      (state as any)[name] = value;
+      Object.assign(state, { [name]: value });
     },
     reset: () => (state) => {
-      (state as any)[name] = initialState;
+      Object.assign(state, { [name]: initialState });
     },
-    select: (state) => {
-      return (state as any)[name];
-    },
-  };
+    select: (state) => state[name],
+  } satisfies AnyOutput<V>;
 }
 
 /**
- * Shortcut to define an `any` slice for schema creation.
+ * Public API for creating a generic unconstrained-value slice in `createSchema`.
+ *
+ * @remarks
+ * Use this when the slice shape is intentionally open-ended.
+ * For richer semantics, prefer dedicated slices like `table`, `obj`, or `num`.
  *
  * @param initialState - The initial value for the slice.
+ * @returns A factory consumed by `createSchema` with the slice name.
+ *
+ * @example
+ * ```ts
+ * const schema = createSchema({
+ *   runtime: slice.any<Record<string, unknown>>({}),
+ * });
+ * ```
  */
 export function any<V>(initialState: V) {
-  return (name: string) => createAny<V, AnyState>({ name, initialState });
+  return (name: string) => createAny<V>({ name, initialState });
 }

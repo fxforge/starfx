@@ -320,7 +320,7 @@ export function* waitFor(predicate: () => Operation<boolean>): Operation<void> {
  * Extract the deterministic id from an action or action-creator.
  */
 export function getIdFromAction(
-  action: ActionWithPayload<{ key: string }> | ActionFnWithPayload,
+  action: ActionWithPayload<{ key: string }> | ActionFnWithPayload<unknown>,
 ): string {
   return typeof action === "function" ? action.toString() : action.payload.key;
 }

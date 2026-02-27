@@ -90,9 +90,7 @@ export type FxSchema<O extends FxMap = FxMap> = {
   [key in keyof O]: ReturnType<NonNullable<O[key]>>;
 } & {
   name: string;
-  initialize: (
-    storeTailMdw: BaseMiddleware<UpdaterCtx<SliceFromSchema<O>>>[],
-  ) => Operation<void>;
+  initialize?: () => Operation<void>;
   update: (
     u: StoreUpdater<SliceFromSchema<O>> | StoreUpdater<SliceFromSchema<O>>[],
   ) => Operation<UpdaterCtx<SliceFromSchema<O>>>;

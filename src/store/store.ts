@@ -10,6 +10,7 @@ import {
   lift,
   suspend,
 } from "effection";
+import { produce } from "immer";
 import { ActionContext, emit } from "../action.js";
 import { createReplaySignal } from "../fx/replay-signal.js";
 import type { AnyAction } from "../types.js";
@@ -91,6 +92,18 @@ export function createStore<O extends FxMap>({
     scope = tuple[0];
   }
 
+  // Use the first schema as the default
+  const schema = schemas[0];
+
+  // Build schemas map by name for selective access
+  const schemasMap = schemas.reduce(
+    (acc, s) => {
+      acc[s.name] = s;
+      return acc;
+    },
+    {} as Record<string, FxSchema<O>>,
+  );
+
   // Build initial state from all schemas
   const initialState = schemas.reduce(
     (acc, schema) => {
@@ -99,6 +112,13 @@ export function createStore<O extends FxMap>({
     {} as SliceFromSchema<O>,
   );
   let state = initialState;
+
+  schemas.forEach((s) => {
+    if (s.initialize) {
+      watch.send(s.initialize);
+    }
+  });
+
   const listeners = new Set<Listener>();
   scope.set(ListenersContext, listeners);
 
@@ -116,7 +136,12 @@ export function createStore<O extends FxMap>({
   }
 
   function setState(newState: SliceFromSchema<O>) {
-    state = newState;
+    // enables merging multiple states from
+    // different schemas without overwriting the whole state
+    // TODO but this means double produce on the default single schema case
+    state = produce(state, (draft) => {
+      Object.assign(draft, newState);
+    });
   }
 
   function getInitialState() {
@@ -159,18 +184,6 @@ export function createStore<O extends FxMap>({
       yield* op();
     });
   }
-
-  // Use the first schema as the default
-  const schema = schemas[0];
-
-  // Build schemas map by name for selective access
-  const schemasMap = schemas.reduce(
-    (acc, s) => {
-      acc[s.name] = s;
-      return acc;
-    },
-    {} as Record<string, FxSchema<O>>,
-  );
 
   const store: FxStore<O> = {
     getScope,

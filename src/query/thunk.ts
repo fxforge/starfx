@@ -349,11 +349,11 @@ export function createThunks<Ctx extends ThunkCtx = ThunkCtx<any>>(
   function manage<Resource>(name: string, inputResource: Operation<Resource>) {
     const CustomContext = createContext<Resource>(name);
     function curVisor(scope: Scope) {
-      return function* () {
+      return supervise(function* () {
         const providedResource = yield* inputResource;
         scope.set(CustomContext, providedResource);
         yield* suspend();
-      };
+      });
     }
 
     watch.send(curVisor);

@@ -254,7 +254,7 @@ const [schema, initialState] = createSchema({
 });
 const store = createStore(initialState);
 
-store.run(function* () {
+store.initialize(function* () {
   yield* schema.update([
     schema.counter.increment(),
     schema.counter.increment(),

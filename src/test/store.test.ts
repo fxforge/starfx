@@ -2,8 +2,10 @@ import {
   type Operation,
   type Result,
   createScope,
+  createThunks,
   parallel,
   put,
+  resource,
   sleep,
   take,
 } from "../index.js";
@@ -13,7 +15,7 @@ import {
   createStore,
   updateStore,
 } from "../store/index.js";
-import { expect, test } from "../test.js";
+import { describe, expect, test } from "../test.js";
 
 interface User {
   id: string;
@@ -178,5 +180,68 @@ test("resets store", async () => {
     dev: false,
     theme: "",
     token: "",
+  });
+});
+
+describe(".manage", () => {
+  function guessAge(): Operation<{ guess: number; cumulative: null | number }> {
+    return resource(function* (provide) {
+      let cumulative = 0 as null | number;
+      try {
+        yield* provide({
+          get guess() {
+            const random = Math.floor(Math.random() * 100);
+            if (cumulative !== null) cumulative += random;
+            return random;
+          },
+          get cumulative() {
+            return cumulative;
+          },
+        });
+      } finally {
+        cumulative = null;
+      }
+    });
+  }
+
+  test("expects resource", async () => {
+    expect.assertions(1);
+
+    const thunk = createThunks();
+    thunk.use(thunk.routes());
+    const store = createStore({ initialState: {} });
+    const TestContext = store.manage("test:context", guessAge());
+    store.initialize(thunk.register);
+    let acc = "bla";
+    const action = thunk.create("/users", function* (payload, next) {
+      const c = yield* TestContext.get();
+      if (c) acc += "b";
+      next();
+    });
+    store.dispatch(action());
+
+    expect(acc).toBe("blab");
+  });
+
+  test("uses resource", async () => {
+    expect.assertions(2);
+
+    const thunk = createThunks();
+    thunk.use(thunk.routes());
+    const store = createStore({ initialState: {} });
+    const TestContext = store.manage("test:context", guessAge());
+    store.initialize(thunk.register);
+    let guess = 0;
+    let acc = 0;
+    const action = thunk.create("/users", function* (payload, next) {
+      const c = yield* TestContext.expect();
+      guess += c.guess;
+      acc += c.cumulative ?? 0;
+      next();
+    });
+    store.dispatch(action());
+
+    expect(guess).toBeGreaterThan(0);
+    expect(acc).toEqual(guess);
   });
 });

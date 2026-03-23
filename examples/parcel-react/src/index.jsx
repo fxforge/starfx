@@ -1,6 +1,6 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
-import { createStore, take } from "starfx";
+import { createStore, take, parallel } from "starfx";
 import { Provider } from "starfx/react";
 import { api, initialState, schema } from "./api.js";
 import { App } from "./app.jsx";
@@ -11,15 +11,17 @@ function init() {
   const store = createStore({ initialState });
   window.fx = store;
 
-  store.run([
-    function* logger() {
-      while (true) {
-        const action = yield* take("*");
-        console.log("action", action);
-      }
-    },
-    api.register,
-  ]);
+  store.initialize(() =>
+    parallel([
+      function* logger() {
+        while (true) {
+          const action = yield* take("*");
+          console.log("action", action);
+        }
+      },
+      api.register,
+    ]),
+  );
 
   ReactDOM.createRoot(document.getElementById("root")).render(
     <React.StrictMode>

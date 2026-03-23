@@ -29,11 +29,11 @@ export const updateUser = api.post<{ id: string; name: string }>(
       body: JSON.stringify({ name: ctx.payload.name }),
     });
     yield* next();
-  },
+  }
 );
 
 const store = createStore(initialState);
-store.run(api.register);
+store.initialize(api.register);
 
 store.dispatch(fetchUsers());
 // now accessible with useCache(fetchUsers)

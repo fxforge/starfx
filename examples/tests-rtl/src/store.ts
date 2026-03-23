@@ -9,7 +9,7 @@ export function setupStore({ initialState = {} }) {
     },
   });
 
-  store.run(api.register);
+  store.initialize(api.register);
 
   return store;
 }

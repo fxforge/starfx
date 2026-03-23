@@ -94,7 +94,7 @@ const fetchUsers = api.get<never, User[]>(
 );
 
 const store = createStore(schema);
-store.run(api.register);
+store.initialize(api.register);
 store.dispatch(fetchUsers());
 ```
 

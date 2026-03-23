@@ -55,7 +55,4 @@ const action = thunks.create("do-thing", function* (ctx, next) {
   console.log(g2.guess, g2.cumulative);
   yield* next();
 });
-
-store.initilize(thunks.register);
-store.dispatch(action());
 ```

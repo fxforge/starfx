@@ -18,14 +18,18 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/neurosnap/starfx.git"
+    "url": "git+https://github.com/fxforge/starfx.git"
   },
-  "author": "Eric Bower",
+  "contributors": [
+    "Eric Bower <me@erock.io>",
+    "Jacob Bolda <me@jacobbolda.com>",
+    "Vlad <vladmarginean@softwiz.ro>"
+  ],
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/neurosnap/starfx/issues"
+    "url": "https://github.com/fxforge/starfx/issues"
   },
-  "homepage": "https://github.com/neurosnap/starfx#readme",
+  "homepage": "https://github.com/fxforge/starfx#readme",
   "dependencies": {
     "effection": "^4",
     "immer": "^11.1.3",

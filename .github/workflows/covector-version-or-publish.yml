@@ -50,10 +50,11 @@ jobs:
           recognizeContributors: true
 
       # We need to run npm again so that `package-lock.json`
-      # is updated if it needs to be before the PR is created
-      # and submitted. We can remove this if this gets baked into
-      # covector
+      # is updated and the package.json is formatted per biome
+      # if it needs to be before the PR is created
       - run: npm install
+        if: steps.covector.outputs.commandRan == 'version'
+      - run: npm run lint
         if: steps.covector.outputs.commandRan == 'version'
 
       - name: Create Pull Request With Versions Bumped

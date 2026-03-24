@@ -164,6 +164,10 @@ export function useLoader<S extends AnyState>(
  * Combines {@link useLoader} with a `trigger` function for dispatching the action.
  * Does NOT automatically fetch data - use `trigger()` to initiate the request.
  *
+ * The returned object includes the loader state fields at the top level
+ * (`status`, `isLoading`, `isSuccess`, etc.), along with `trigger` and `action`.
+ * It does not return a nested `loader` property.
+ *
  * For automatic fetching on mount, use {@link useQuery} instead.
  *
  * @typeParam P - The payload type for the action.
@@ -360,6 +364,25 @@ export function useCache<P = any, ApiSuccess = any>(
  * @param cur - The loader state to watch (from {@link useLoader} or {@link useApi}).
  * @param success - Callback to execute on success transition.
  *
+ * @example Use directly with useApi
+ * ```tsx
+ * import { useApi, useLoaderSuccess } from 'starfx/react';
+ *
+ * function CreateUserForm() {
+ *   const api = useApi(createUser);
+ *
+ *   useLoaderSuccess(api, () => {
+ *     toast.success('User created successfully');
+ *   });
+ *
+ *   const handleSubmit = (data: FormData) => {
+ *     api.trigger({ name: data.get('name') });
+ *   };
+ *
+ *   return <form onSubmit={handleSubmit}>...</form>;
+ * }
+ * ```
+ *
  * @example Navigate after form submission
  * ```tsx
  * import { useApi, useLoaderSuccess } from 'starfx/react';
@@ -367,31 +390,17 @@ export function useCache<P = any, ApiSuccess = any>(
  *
  * function CreateUserForm() {
  *   const navigate = useNavigate();
- *   const { trigger, ...loader } = useApi(createUser);
+ *   const api = useApi(createUser);
  *
- *   useLoaderSuccess(loader, () => {
- *     // Navigate to user list after successful creation
+ *   useLoaderSuccess(api, () => {
  *     navigate('/users');
  *   });
  *
  *   const handleSubmit = (data: FormData) => {
- *     trigger({ name: data.get('name') });
+ *     api.trigger({ name: data.get('name') });
  *   };
  *
  *   return <form onSubmit={handleSubmit}>...</form>;
- * }
- * ```
- *
- * @example Show success toast
- * ```tsx
- * function DeleteButton({ id }: { id: string }) {
- *   const { trigger, ...loader } = useApi(deleteUser);
- *
- *   useLoaderSuccess(loader, () => {
- *     toast.success('User deleted successfully');
- *   });
- *
- *   return <button onClick={() => trigger({ id })}>Delete</button>;
  * }
  * ```
  */

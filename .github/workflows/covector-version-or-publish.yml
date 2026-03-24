@@ -1,0 +1,69 @@
+name: version or publish
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  # required for npm provenance
+  id-token: write
+  # required to create the GitHub Release
+  contents: write
+  # required for creating the Version Packages Release
+  pull-requests: write
+
+jobs:
+  version-or-publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 65
+    outputs:
+      change: ${{ steps.covector.outputs.change }}
+      commandRan: ${{ steps.covector.outputs.commandRan }}
+      successfulPublish: ${{ steps.covector.outputs.successfulPublish }}
+
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0 # required for use of git history
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24.x
+      - name: install
+        run: npm ci
+
+      - name: git config
+        run: |
+          git config --global user.name "${{ github.event.pusher.name }}"
+          git config --global user.email "${{ github.event.pusher.email }}"
+
+      - name: build
+        run: npm run build
+
+      - name: covector version or publish (publish when no change files present)
+        uses: jbolda/covector/packages/action@covector-v0
+        id: covector
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          command: "version-or-publish"
+          createRelease: true
+          recognizeContributors: true
+
+      # We need to run npm again so that `package-lock.json`
+      # is updated if it needs to be before the PR is created
+      # and submitted. We can remove this if this gets baked into
+      # covector
+      - run: npm install
+        if: steps.covector.outputs.commandRan == 'version'
+
+      - name: Create Pull Request With Versions Bumped
+        id: cpr
+        uses: peter-evans/create-pull-request@v8
+        if: steps.covector.outputs.commandRan == 'version'
+        with:
+          draft: true
+          title: "Publish New Version"
+          commit-message: "publish new versions"
+          labels: "version updates"
+          branch: "release"
+          body: ${{ steps.covector.outputs.change }}

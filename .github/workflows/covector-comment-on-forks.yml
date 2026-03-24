@@ -1,0 +1,26 @@
+name: covector comment
+
+on:
+  workflow_run:
+    workflows: [covector status]
+    types:
+      - completed
+
+# note all other permissions are set to none if not specified
+permissions:
+  # to read the action artifacts
+  actions: read
+  # to write the comment
+  pull-requests: write
+
+jobs:
+  download:
+    runs-on: ubuntu-latest
+    if: github.event.workflow_run.conclusion == 'success' &&
+      (github.event.workflow_run.head_repository.full_name != github.repository || github.actor == 'dependabot[bot]')
+    steps:
+      - name: covector status
+        uses: jbolda/covector/packages/action@covector-v0
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          command: "status"

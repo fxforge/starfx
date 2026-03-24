@@ -1,6 +1,6 @@
 {
   "name": "starfx",
-  "version": "0.16.0-beta.0",
+  "version": "0.16.0",
   "description": "A micro-mvc framework for react apps",
   "type": "module",
   "files": ["/dist"],

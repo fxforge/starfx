@@ -1,0 +1,29 @@
+{
+  "gitSiteUrl": "https://github.com/fxforge/starfx/",
+  "additionalBumpTypes": ["housekeeping"],
+  "changeTags": {
+    "feat": "New Features",
+    "enhance": "Enhancements",
+    "bug": "Bug Fixes",
+    "deps": "Dependencies",
+    "internal": "Changes Supporting Development"
+  },
+  "pkgManagers": {
+    "javascript": {
+      "version": true,
+      "getPublishedVersion": {
+        "use": "fetch:check",
+        "options": {
+          "url": "https://registry.npmjs.com/${ pkg.pkg }/${ pkg.pkgFile.version }"
+        }
+      },
+      "publish": ["npm publish --provenance --access public"]
+    }
+  },
+  "packages": {
+    "starfx": {
+      "path": ".",
+      "manager": "javascript"
+    }
+  }
+}

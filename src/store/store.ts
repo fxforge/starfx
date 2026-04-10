@@ -1,18 +1,13 @@
 import {
-  type Callable,
   type Operation,
   type Scope,
-  type Task,
   createContext,
   createScope,
   createSignal,
-  each,
-  lift,
   suspend,
 } from "effection";
 import { produce } from "immer";
 import { ActionContext, emit } from "../action.js";
-import { createReplaySignal } from "../fx/replay-signal.js";
 import type { AnyAction } from "../types.js";
 import { StoreContext } from "./context.js";
 import { createRun } from "./run.js";
@@ -22,8 +17,9 @@ import type {
   FxStore,
   Listener,
   SliceFromSchema,
-  UpdaterCtx,
 } from "./types.js";
+import { parallel } from "../fx/parallel.js";
+import { supervise } from "../fx/supervisor.js";
 const stubMsg = "This is merely a stub, not implemented";
 
 let id = 0;
@@ -40,9 +36,41 @@ function observable() {
   };
 }
 
+/**
+ * Creates a managed resource within the store's Effection scope.
+ *
+ * @remarks
+ * The `manage` function allows you to define a resource that can be passed to
+ * the `createStore({ tasks: [() => manage(...)] })` configuration. This resource will be automatically
+ * initialized and cleaned up with the store's lifecycle. The provided resource is made available through a generated context that can be accessed by any operation within the store's scope.
+ *
+ * @param name - A unique name for the resource, used to create a context.
+ * @param inputResource - An Effection operation that initializes the resource.
+ * @returns A context object with an `initialize` method for setting up the resource.
+ */
+export function manage<Resource>(
+  name: string,
+  inputResource: Operation<Resource>,
+) {
+  const CustomContext = createContext<Resource>(name);
+  function initialize(parentScope: Scope) {
+    return supervise(function* () {
+      const providedResource = yield* inputResource;
+      parentScope.set(CustomContext, providedResource);
+      yield* suspend();
+    });
+  }
+
+  // returns to the user so they can use this resource from
+  //  anywhere this context is available
+  return { ...CustomContext, initialize };
+}
+
 export interface CreateStore<O extends FxMap> {
   scope?: Scope;
-  schemas: FxSchema<O>[];
+  schema?: FxSchema<O>;
+  schemas?: FxSchema<O>[];
+  tasks?: (() => Operation<void>)[];
 }
 
 export const IdContext = createContext("starfx:id", 0);
@@ -82,26 +110,37 @@ export const ListenersContext = createContext<Set<Listener>>(
  */
 export function createStore<O extends FxMap>({
   scope: initScope,
-  schemas,
+  schema: singleSchema,
+  schemas: multiSchemas,
+  tasks = [],
 }: CreateStore<O>): FxStore<O> {
-  let scope: Scope;
-  if (initScope) {
-    scope = initScope;
-  } else {
-    const tuple = createScope();
-    scope = tuple[0];
+  // ensure only schema or schemas is provided, not both or neither
+  if (singleSchema && multiSchemas) {
+    throw new Error("Provide either `schema` or `schemas`, not both.");
   }
+  if (!singleSchema && !multiSchemas) {
+    throw new Error("At least one schema must be provided.");
+  }
+
+  // normalize to array of schemas for easier processing
+  let schemas: FxSchema<O>[];
+  if (singleSchema) {
+    schemas = [singleSchema];
+  } else if (multiSchemas) {
+    schemas = multiSchemas;
+  } else {
+    throw new Error("Provide either `schema` or `schemas`.");
+  }
+  const baseSchema = schemas[0];
+
+  const [scope] = initScope ? [initScope] : createScope();
 
   const listeners = new Set<Listener>();
   scope.set(ListenersContext, listeners);
 
   const signal = createSignal<AnyAction, void>();
-  const watch = createReplaySignal<Callable<Operation<void>>, void>();
   scope.set(ActionContext, signal);
   scope.set(IdContext, id++);
-
-  // Use the first schema as the default
-  const schema = schemas[0];
 
   // Build schemas map by name for selective access
   const schemasMap = schemas.reduce(
@@ -120,12 +159,6 @@ export function createStore<O extends FxMap>({
     {} as SliceFromSchema<O>,
   );
   let state = initialState;
-
-  schemas.forEach((s) => {
-    if (s.initialize) {
-      watch.send(s.initialize);
-    }
-  });
 
   function getScope() {
     return scope;
@@ -157,42 +190,15 @@ export function createStore<O extends FxMap>({
     emit({ signal, action });
   }
 
-  function manage<Resource>(name: string, inputResource: Operation<Resource>) {
-    const CustomContext = createContext<Resource>(name);
-    function* manager() {
-      const providedResource = yield* inputResource;
-      scope.set(CustomContext, providedResource);
-      yield* suspend();
-    }
-    watch.send(manager);
-
-    // returns to the user so they can use this resource from
-    //  anywhere this context is available
-    return CustomContext;
-  }
-
   const run = createRun(scope);
-
-  function initialize<T>(op: () => Operation<T>): Task<void> {
-    return scope.run(function* (): Operation<void> {
-      yield* scope.spawn(function* () {
-        for (const watched of yield* each(watch)) {
-          yield* scope.spawn(watched);
-          yield* each.next();
-        }
-      });
-      yield* op();
-    });
-  }
 
   const store: FxStore<O> = {
     getScope,
     getState,
     setState,
     subscribe,
-    initialize,
     manage,
-    schema,
+    schema: baseSchema,
     schemas: schemasMap,
     run,
     // instead of actions relating to store mutation, they
@@ -209,5 +215,17 @@ export function createStore<O extends FxMap>({
   };
 
   scope.set(StoreContext, store as FxStore<FxMap>);
+
+  run(function* (): Operation<void> {
+    const schemaInit = schemas
+      .map((s) => s.initialize)
+      .filter(
+        (init): init is () => Operation<void> => typeof init === "function",
+      );
+
+    const group = yield* parallel([...schemaInit, ...tasks]);
+    yield* group;
+  });
+
   return store;
 }

@@ -86,13 +86,7 @@ export function createStore<S extends AnyState>({
   scope: initScope,
   middleware = [],
 }: CreateStore<S>): FxStore<S> {
-  let scope: Scope;
-  if (initScope) {
-    scope = initScope;
-  } else {
-    const tuple = createScope();
-    scope = tuple[0];
-  }
+  const [scope] = initScope ? [initScope] : createScope();
 
   let state = initialState;
   const listeners = new Set<Listener>();

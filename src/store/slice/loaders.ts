@@ -5,7 +5,7 @@ import type {
   LoaderPayload,
   LoaderState,
 } from "../../types.js";
-import type { BaseSchema, SliceState } from "../types.js";
+import type { BaseSchema } from "../types.js";
 
 interface PropId {
   id: string;
@@ -85,21 +85,17 @@ export function defaultLoader(l: Partial<LoaderItemState> = {}): LoaderState {
   };
 }
 type LoaderTable = Record<string, LoaderItemState>;
+type LoaderRootState = Record<string, LoaderTable>;
+type LoaderStateView = Immutable<LoaderRootState>;
+type LoaderDraftState = Draft<LoaderRootState>;
 
 export interface LoaderSelectors {
   findById: (d: Immutable<LoaderTable>, p: PropId) => LoaderState;
   findByIds: (d: Immutable<LoaderTable>, p: PropIds) => LoaderState[];
-  selectTable: (
-    s: Immutable<SliceState<LoaderTable>>,
-  ) => Immutable<LoaderTable>;
-  selectTableAsList: (
-    state: Immutable<SliceState<LoaderTable>>,
-  ) => LoaderItemState[];
-  selectById: (s: Immutable<SliceState<LoaderTable>>, p: PropId) => LoaderState;
-  selectByIds: (
-    s: Immutable<SliceState<LoaderTable>>,
-    p: PropIds,
-  ) => LoaderState[];
+  selectTable: (s: LoaderStateView) => Immutable<LoaderTable>;
+  selectTableAsList: (state: LoaderStateView) => Immutable<LoaderItemState[]>;
+  selectById: (s: LoaderStateView, p: PropId) => LoaderState;
+  selectByIds: (s: LoaderStateView, p: PropIds) => LoaderState[];
 }
 
 function loaderSelectors(selectTable: LoaderSelectors["selectTable"]) {
@@ -115,7 +111,7 @@ function loaderSelectors(selectTable: LoaderSelectors["selectTable"]) {
     findById,
     findByIds,
     selectTable,
-    selectTableAsList: createSelector([selectTable], (data) =>
+    selectTableAsList: createSelector(selectTable, (data) =>
       Object.values(data).filter(excludesFalse),
     ),
     selectById: createSelector(
@@ -132,11 +128,11 @@ function loaderSelectors(selectTable: LoaderSelectors["selectTable"]) {
 }
 
 export interface LoaderActions {
-  start: (e: LoaderPayload) => (s: Draft<SliceState<LoaderTable>>) => void;
-  success: (e: LoaderPayload) => (s: Draft<SliceState<LoaderTable>>) => void;
-  error: (e: LoaderPayload) => (s: Draft<SliceState<LoaderTable>>) => void;
-  reset: () => (s: Draft<SliceState<LoaderTable>>) => void;
-  resetByIds: (ids: string[]) => (s: Draft<SliceState<LoaderTable>>) => void;
+  start: (e: LoaderPayload) => (s: LoaderDraftState) => void;
+  success: (e: LoaderPayload) => (s: LoaderDraftState) => void;
+  error: (e: LoaderPayload) => (s: LoaderDraftState) => void;
+  reset: () => (s: LoaderDraftState) => void;
+  resetByIds: (ids: string[]) => (s: LoaderDraftState) => void;
 }
 
 export interface LoaderOutput
@@ -153,7 +149,7 @@ export const createLoaders = ({
   name,
   initialState = {},
 }: {
-  name: keyof SliceState<LoaderTable>;
+  name: keyof LoaderRootState;
   initialState?: LoaderTable;
 }): LoaderOutput => {
   const loaderInitialState = initialState ?? {};
@@ -161,7 +157,7 @@ export const createLoaders = ({
 
   const output = {
     schema: "loader",
-    name,
+    name: String(name),
     initialState: loaderInitialState,
     start: (e) => (s) => {
       const table = s[name];

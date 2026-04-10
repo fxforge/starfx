@@ -14,8 +14,8 @@ import {
 } from "./store/index.js";
 import type { LoaderOutput } from "./store/slice/loaders.js";
 import type { TableOutput } from "./store/slice/table.js";
-import type { FxMap } from "./store/types.js";
-import type { LoaderState } from "./types.js";
+import type { FxMap, SliceFromSchema } from "./store/types.js";
+import type { AnyState, LoaderState } from "./types.js";
 import type { ActionFn, ActionFnWithPayload } from "./types.js";
 
 export { useDispatch, useSelector } from "react-redux";
@@ -30,9 +30,9 @@ const {
 } = React;
 
 type WithLoadersMap = FxMap & { loaders: (n: string) => LoaderOutput };
-type WithCacheMap = FxMap & { cache: (n: string) => TableOutput<any> };
+type WithCacheMap = FxMap & { cache: (n: string) => TableOutput<AnyState> };
 
-export interface UseApiProps<P = any> extends LoaderState {
+export interface UseApiProps<P = unknown> extends LoaderState {
   trigger: (p: P) => void;
   action: ActionFnWithPayload<P>;
 }
@@ -54,6 +54,16 @@ export interface UseCacheResult<D, A extends ThunkAction = ThunkAction>
   extends UseApiAction<A> {
   data: D | null;
 }
+
+type LoaderActionInput = ThunkAction | ActionFn | ActionFnWithPayload<never>;
+type ApiActionInput = ThunkAction | ActionFn | ActionFnWithPayload<never>;
+type UseApiReturn<A extends ApiActionInput> = A extends ActionFn
+  ? UseApiSimpleProps
+  : A extends ActionFnWithPayload<infer P>
+    ? UseApiProps<P>
+    : A extends ThunkAction
+      ? UseApiAction<A>
+      : never;
 
 const SchemaContext = createContext<FxSchema<FxMap> | null>(null);
 
@@ -90,23 +100,11 @@ const SchemaContext = createContext<FxSchema<FxMap> | null>(null);
  * }
  * ```
  */
-export function Provider<O extends FxMap>(props: {
+export function Provider<O extends FxMap = FxMap>(props: {
   store: FxStore<O>;
   schema?: FxSchema<O>;
   children?: React.ReactNode;
-}): React.ReactElement;
-
-export function Provider(props: {
-  store: FxStore<FxMap>;
-  schema?: FxSchema<FxMap>;
-  children?: React.ReactNode;
-}): React.ReactElement;
-
-export function Provider(props: {
-  store: FxStore<FxMap>;
-  schema?: FxSchema<FxMap>;
-  children?: React.ReactNode;
-}) {
+}): React.ReactElement {
   const { store, schema, children } = props;
   // Use provided schema or pull from store
   const schemaValue = (schema ?? store.schema) as FxSchema<FxMap>;
@@ -114,28 +112,28 @@ export function Provider(props: {
   return h(ReduxProvider, { store, children: inner });
 }
 
-export function useSchema<O extends FxMap>() {
+export function useSchema<O extends FxMap = FxMap>(): FxSchema<O> {
   const ctx = useContext(SchemaContext);
   if (!ctx) throw new Error("No Schema available in context");
   return ctx as FxSchema<O>;
 }
 
 // Typed variant for schemas that include `loaders`.
-export function useSchemaWithLoaders(): FxSchema<WithLoadersMap>;
-export function useSchemaWithLoaders<O extends WithLoadersMap>(): FxSchema<O>;
-export function useSchemaWithLoaders() {
+export function useSchemaWithLoaders<
+  O extends WithLoadersMap = WithLoadersMap,
+>(): FxSchema<O> {
   const ctx = useContext(SchemaContext);
   if (!ctx) throw new Error("No Schema available in context");
-  return ctx as FxSchema<WithLoadersMap>;
+  return ctx as FxSchema<O>;
 }
 
 // Typed variant for schemas that include `cache`.
-export function useSchemaWithCache(): FxSchema<WithCacheMap>;
-export function useSchemaWithCache<O extends WithCacheMap>(): FxSchema<O>;
-export function useSchemaWithCache() {
+export function useSchemaWithCache<
+  O extends WithCacheMap = WithCacheMap,
+>(): FxSchema<O> {
   const ctx = useContext(SchemaContext);
   if (!ctx) throw new Error("No Schema available in context");
-  return ctx as FxSchema<WithCacheMap>;
+  return ctx as FxSchema<O>;
 }
 
 export function useStore<O extends FxMap>() {
@@ -174,16 +172,16 @@ export function useStore<O extends FxMap>() {
  * }
  * ```
  */
-export function useLoader(
-  action: ThunkAction | ActionFnWithPayload<any>,
-): LoaderState;
-export function useLoader<O extends WithLoadersMap>(
-  action: ThunkAction | ActionFnWithPayload<any>,
-): LoaderState;
-export function useLoader(action: any) {
-  const schema = useSchemaWithLoaders();
+export function useLoader<
+  O extends WithLoadersMap = WithLoadersMap,
+  A extends LoaderActionInput = LoaderActionInput,
+>(action: A): LoaderState {
+  const schema = useSchemaWithLoaders<O>();
   const id = getIdFromAction(action);
-  return useSelector((s: any) => schema.loaders.selectById(s, { id }));
+  type LoaderSelectState = Parameters<typeof schema.loaders.selectById>[0];
+  return useSelector((s: SliceFromSchema<O>) =>
+    schema.loaders.selectById(s as unknown as LoaderSelectState, { id }),
+  );
 }
 
 /**
@@ -216,26 +214,17 @@ export function useLoader(action: any) {
  * }
  * ```
  */
-export function useApi<P = any, A extends ThunkAction = ThunkAction<P>>(
-  action: A,
-): UseApiAction<A>;
-export function useApi<P = any, A extends ThunkAction = ThunkAction<P>>(
-  action: ActionFnWithPayload<P>,
-): UseApiProps<P>;
-export function useApi<A extends ThunkAction = ThunkAction>(
-  action: ActionFn,
-): UseApiSimpleProps;
-export function useApi(action: any): any {
+export function useApi<A extends ApiActionInput>(action: A): UseApiReturn<A> {
   const dispatch = useDispatch();
   const loader = useLoader(action);
-  const trigger = (p: any) => {
+  const trigger = (p?: unknown) => {
     if (typeof action === "function") {
-      dispatch(action(p));
+      dispatch((action as ActionFnWithPayload<unknown>)(p));
     } else {
       dispatch(action);
     }
   };
-  return { ...loader, trigger, action };
+  return { ...loader, trigger, action } as UseApiReturn<A>;
 }
 
 /**
@@ -248,10 +237,13 @@ export function useApi(action: any): any {
  * @param action - The dispatched action to execute.
  * @returns Loader state and trigger function.
  */
-export function useQuery<P = any, A extends ThunkAction = ThunkAction<P>>(
+export function useQuery<
+  P = unknown,
+  A extends ThunkAction<P> = ThunkAction<P>,
+>(
   action: A,
 ): UseApiAction<A> {
-  const api = useApi(action);
+  const api = useApi(action) as UseApiAction<A>;
   useEffect(() => {
     api.trigger();
   }, [action.payload.key]);
@@ -275,20 +267,21 @@ export function useQuery<P = any, A extends ThunkAction = ThunkAction<P>>(
  * return <Users users={data || []} />;
  * ```
  */
-export function useCache(action: ThunkAction): UseCacheResult<any, ThunkAction>;
 export function useCache<
-  S extends { cache: TableOutput<any>["initialState"] },
-  P = any,
-  ApiSuccess = any,
+  O extends WithCacheMap = WithCacheMap,
+  P = unknown,
+  ApiSuccess = unknown,
 >(
   action: ThunkAction<P, ApiSuccess>,
-): UseCacheResult<typeof action.payload._result, ThunkAction<P, ApiSuccess>>;
-export function useCache(action: any) {
-  const schema = useSchemaWithCache();
+): UseCacheResult<ApiSuccess, ThunkAction<P, ApiSuccess>> {
+  const schema = useSchemaWithCache<O>();
   const id = action.payload.key;
-  const data = useSelector((s: any) => schema.cache.selectById(s, { id }));
+  type CacheSelectState = Parameters<typeof schema.cache.selectById>[0];
+  const data = useSelector((s: SliceFromSchema<O>) =>
+    schema.cache.selectById(s as unknown as CacheSelectState, { id }),
+  );
   const query = useQuery(action);
-  return { ...query, data: (data as any) || null };
+  return { ...query, data: (data as ApiSuccess | undefined) ?? null };
 }
 
 /**
@@ -310,7 +303,7 @@ export function useCache(action: any) {
  */
 export function useLoaderSuccess(
   cur: Pick<LoaderState, "status">,
-  success: () => any,
+  success: () => void,
 ) {
   const prev = useRef(cur);
   useEffect(() => {
@@ -342,8 +335,11 @@ export function PersistGate({
   loading = h(Loading),
 }: PersistGateProps) {
   const schema = useSchemaWithLoaders();
-  const ldr = useSelector((s: any) =>
-    schema.loaders.selectById(s, { id: PERSIST_LOADER_ID }),
+  type LoaderSelectState = Parameters<typeof schema.loaders.selectById>[0];
+  const ldr = useSelector((s: SliceFromSchema<WithLoadersMap>) =>
+    schema.loaders.selectById(s as unknown as LoaderSelectState, {
+      id: PERSIST_LOADER_ID,
+    }),
   );
 
   if (ldr.status === "error") {

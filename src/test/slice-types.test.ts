@@ -15,6 +15,7 @@ import type {
   StrOutput,
   TableOutput,
 } from "../store/slice/index.js";
+import type { FxMap } from "../store/types.js";
 import type { AnyState } from "../types.js";
 
 // =============================================================================
@@ -382,6 +383,49 @@ describe("createSchema types", () => {
 
     // update should accept the slice updater functions
     expectTypeOf(schema.update).toBeFunction();
+  });
+
+  test("schema custom slices are directly accessible", () => {
+    const schema = createSchema({
+      metadata: slice.obj<Record<string, string>>({}),
+      cache: slice.table({ empty: {} }),
+      loaders: slice.loaders(),
+    });
+
+    // Repro case for downstream React usage:
+    // const metadata = useSelector(schema.metadata.select)
+    expectTypeOf(schema.metadata).toExtend<ObjOutput<Record<string, string>>>();
+    expectTypeOf(schema.metadata).not.toBeUndefined();
+    expectTypeOf(schema.metadata.select).toBeFunction();
+  });
+
+  test("failure: broad FxMap annotation drops custom slice typing", () => {
+    const slices: FxMap = {
+      metadata: slice.obj<Record<string, string>>({}),
+      cache: slice.table({ empty: {} }),
+      loaders: slice.loaders(),
+    };
+    const schema = createSchema(slices);
+
+    // This reproduces the downstream issue when schema typing is widened.
+    // @ts-expect-error metadata comes from FxMap index signature here
+    schema.metadata.select;
+  });
+
+  test("schema keeps custom slice typing with loose middleware option", () => {
+    const schema = createSchema(
+      {
+        metadata: slice.obj({ name: "Default", lastUpdated: "" }),
+        cache: slice.table({ empty: {} }),
+        loaders: slice.loaders(),
+      },
+      {
+        // Matches downstream usage where middleware is intentionally cast.
+        middleware: [(() => undefined) as unknown],
+      },
+    );
+
+    expectTypeOf(schema.metadata.select).toBeFunction();
   });
 });
 

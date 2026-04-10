@@ -60,6 +60,22 @@ export interface CreateSchemaWithUpdaterOptions<S extends AnyState> {
   initialize?: () => Operation<void>;
 }
 
+interface CreateSchemaOptions<O extends FxMap> {
+  /**
+   * Unique name for this schema. Used to access the schema from the store.
+   * @default "default"
+   */
+  name?: string;
+  /**
+   * Escape hatch for middleware values that are not typed to this schema.
+   *
+   * @remarks
+   * This preserves slice inference from the `slices` argument when callers
+   * intentionally cast middleware.
+   */
+  middleware?: BaseMiddleware<UpdaterCtx<SliceFromSchema<O>>>[] | unknown[];
+}
+
 function* logMdw<O extends FxMap>(
   ctx: UpdaterCtx<SliceFromSchema<O>>,
   next: Next,
@@ -198,22 +214,19 @@ export function createSchemaWithUpdater<O extends FxMap>(
  * @param options - Schema options including `name` and custom middleware.
  * @returns A configured schema with `update`, `reset`, and generated slices.
  */
-export function createSchema<O extends FxMap>(
+export function createSchema<const O extends FxMap = FxMap>(
   slices?: O,
-  options: {
-    /**
-     * Unique name for this schema. Used to access the schema from the store.
-     * @default "default"
-     */
-    name?: string;
-    middleware?: BaseMiddleware<UpdaterCtx<SliceFromSchema<O>>>[];
-  } = {},
+  options: CreateSchemaOptions<O> = {},
 ): FxSchema<O> {
   enablePatches();
 
+  const middleware = options.middleware as
+    | BaseMiddleware<UpdaterCtx<SliceFromSchema<O>>>[]
+    | undefined;
+
   return createSchemaWithUpdater(slices ?? defaultSchema<O>(), {
     name: options.name,
-    middleware: options.middleware,
+    middleware,
     *updateMdw(ctx: UpdaterCtx<SliceFromSchema<O>>, next: Next) {
       const store: FxStore<O> = yield* expectStore<O>();
       const upds: StoreUpdater<SliceFromSchema<O>>[] = Array.isArray(

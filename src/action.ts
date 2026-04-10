@@ -12,8 +12,7 @@ import {
 } from "effection";
 import { type ActionPattern, matcher } from "./matcher.js";
 import { createFilterQueue } from "./queue.js";
-import type { Action, ActionWithPayload, AnyAction } from "./types.js";
-import type { ActionFnWithPayload } from "./types.js";
+import type { Action, ActionFn, ActionFnWithPayload, ActionWithPayload, AnyAction } from "./types.js";
 
 /**
  * Shared action signal used by `put`, `useActions`, and related helpers.
@@ -320,7 +319,10 @@ export function* waitFor(predicate: () => Operation<boolean>): Operation<void> {
  * Extract the deterministic id from an action or action-creator.
  */
 export function getIdFromAction(
-  action: ActionWithPayload<{ key: string }> | ActionFnWithPayload<unknown>,
+  action:
+    | ActionWithPayload<{ key: string }>
+    | ActionFn
+    | ActionFnWithPayload<never>,
 ): string {
   return typeof action === "function" ? action.toString() : action.payload.key;
 }

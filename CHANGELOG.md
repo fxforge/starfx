@@ -1,5 +1,11 @@
 # Changelog
 
+## \[0.16.1]
+
+### Dependencies
+
+- [`a06e93c`](https://github.com/fxforge/starfx/commit/a06e93c85507392228904f4e9b3640d0ab69e56f) ([#88](https://github.com/fxforge/starfx/pull/88) by [@jbolda](https://github.com/fxforge/starfx/../../jbolda)) The `createScope` return signature change slightly in the upcoming version of `effection`. Adjusting preemptively for future compatibility.
+
 ## \[0.16.0]
 
 - Update to `effection` v4.

@@ -14,7 +14,7 @@ export interface ObjActions<V extends ObjBase> {
 }
 
 export interface ObjSelectors<V extends ObjBase> {
-  select: (s: SliceState<V>) => Immutable<V>;
+  select: (s: Record<string, unknown>) => Immutable<V>;
 }
 
 export interface ObjOutput<V extends ObjBase>
@@ -24,6 +24,9 @@ export interface ObjOutput<V extends ObjBase>
   schema: "obj";
   initialState: V;
 }
+
+const selectValue = <T>(state: Record<string, unknown>, name: string): T =>
+  state[name] as T;
 
 export function createObj<V extends ObjBase>({
   name,
@@ -52,7 +55,7 @@ export function createObj<V extends ObjBase>({
         Object.assign(state, { [name]: { [prop.key]: prop.value } });
       }
     },
-    select: (state) => state[name],
+    select: (state) => selectValue<Immutable<V>>(state, String(name)),
   } satisfies ObjOutput<V>;
 }
 

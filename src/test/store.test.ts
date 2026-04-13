@@ -14,6 +14,7 @@ import {
   StoreUpdateContext,
   createSchema,
   createStore,
+  manage,
   slice,
   updateStore,
 } from "../store/index.js";
@@ -79,7 +80,7 @@ test("update store and receives update from channel `StoreUpdateContext`", async
   const schema = testSchema({
     users: { 1: { id: "1", name: "testing" }, 2: { id: "2", name: "wow" } },
   });
-  const testStore = createStore({ scope, schemas: [schema] });
+  const testStore = createStore({ scope, schema });
   // biome-ignore lint/suspicious/noExplicitAny: test-only
   let store: any;
   await scope.run(function* (): Operation<Result<void>[]> {
@@ -93,7 +94,7 @@ test("update store and receives update from channel `StoreUpdateContext`", async
       function* () {
         // TODO we may need to consider how to handle this, is it a breaking change?
         yield* sleep(0);
-        yield* updateStore(updateUser({ id: "1", name: "eric" }));
+        yield* updateStore<State>(updateUser({ id: "1", name: "eric" }));
       },
     ]);
     return yield* result;
@@ -111,7 +112,7 @@ test("update store and receives update from `subscribe()`", async () => {
   const schema = testSchema({
     users: { 1: { id: "1", name: "testing" }, 2: { id: "2", name: "wow" } },
   });
-  const store = createStore({ schemas: [schema] });
+  const store = createStore({ schema });
 
   store.subscribe(() => {
     expect(store.getState()).toEqual({
@@ -123,7 +124,7 @@ test("update store and receives update from `subscribe()`", async () => {
   });
 
   await store.run(function* () {
-    yield* updateStore(updateUser({ id: "1", name: "eric" }));
+    yield* updateStore<State>(updateUser({ id: "1", name: "eric" }));
   });
 });
 
@@ -132,13 +133,13 @@ test("emit Action and update store", async () => {
   const schema = testSchema({
     users: { 1: { id: "1", name: "testing" }, 2: { id: "2", name: "wow" } },
   });
-  const store = createStore({ schemas: [schema] });
+  const store = createStore({ schema });
 
   await store.run(function* (): Operation<void> {
     const result = yield* parallel([
       function* (): Operation<void> {
         const action = yield* take<UpdateUserProps>("UPDATE_USER");
-        yield* updateStore(updateUser(action.payload));
+        yield* updateStore<State>(updateUser(action.payload));
       },
       function* () {
         // TODO we may need to consider how to handle this, is it a breaking change?
@@ -162,7 +163,7 @@ test("resets store", async () => {
   const schema = testSchema({
     users: { 1: { id: "1", name: "testing" }, 2: { id: "2", name: "wow" } },
   });
-  const store = createStore({ schemas: [schema] });
+  const store = createStore({ schema });
 
   await store.run(function* () {
     yield* schema.update((s: State) => {
@@ -215,16 +216,25 @@ describe(".manage", () => {
 
     const thunk = createThunks();
     thunk.use(thunk.routes());
-    const store = createStore({ schemas: [createSchema()] });
-    const TestContext = store.manage("test:context", guessAge());
-    store.initialize(thunk.register);
+    const [scope] = createScope();
+    const TestContext = manage("test:context", guessAge());
+    const store = createStore({
+      scope,
+      schemas: [createSchema()],
+      tasks: [TestContext.initialize(scope), thunk.register],
+    });
     let acc = "bla";
     const action = thunk.create("/users", function* (payload, next) {
       const c = yield* TestContext.get();
       if (c) acc += "b";
       next();
     });
-    store.dispatch(action());
+
+    await store.run(function* (): Operation<void> {
+      yield* sleep(0);
+      store.dispatch(action());
+      yield* sleep(0);
+    });
 
     expect(acc).toBe("blab");
   });
@@ -234,9 +244,13 @@ describe(".manage", () => {
 
     const thunk = createThunks();
     thunk.use(thunk.routes());
-    const store = createStore({ schemas: [createSchema()] });
-    const TestContext = store.manage("test:context", guessAge());
-    store.initialize(thunk.register);
+    const [scope] = createScope();
+    const TestContext = manage("test:context", guessAge());
+    const store = createStore({
+      scope,
+      schemas: [createSchema()],
+      tasks: [TestContext.initialize(scope), thunk.register],
+    });
     let guess = 0;
     let acc = 0;
     const action = thunk.create("/users", function* (payload, next) {
@@ -245,7 +259,12 @@ describe(".manage", () => {
       acc += c.cumulative ?? 0;
       next();
     });
-    store.dispatch(action());
+
+    await store.run(function* (): Operation<void> {
+      yield* sleep(0);
+      store.dispatch(action());
+      yield* sleep(0);
+    });
 
     expect(guess).toBeGreaterThan(0);
     expect(acc).toEqual(guess);

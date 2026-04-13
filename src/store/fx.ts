@@ -2,7 +2,12 @@ import type { Operation, Result } from "effection";
 import { getIdFromAction, take } from "../action.js";
 import { parallel, safe } from "../fx/index.js";
 import type { ThunkAction } from "../query/index.js";
-import type { ActionFnWithPayload, AnyState, LoaderState } from "../types.js";
+import type {
+  ActionFn,
+  ActionFnWithPayload,
+  AnyState,
+  LoaderState,
+} from "../types.js";
 import { expectStore } from "./context.js";
 import type { LoaderOutput } from "./slice/loaders.js";
 import type {
@@ -38,7 +43,7 @@ export function* select<S, Args extends unknown[], R>(
 
 export function* waitForLoader(
   loaders: LoaderOutput,
-  action: ThunkAction | ActionFnWithPayload<unknown>,
+  action: ThunkAction | ActionFn | ActionFnWithPayload<never>,
 ): Operation<LoaderState> {
   const id = getIdFromAction(action);
   const selector = (s: Parameters<typeof loaders.selectById>[0]) =>
@@ -61,7 +66,7 @@ export function* waitForLoader(
 
 export function* waitForLoaders(
   loaders: LoaderOutput,
-  actions: (ThunkAction | ActionFnWithPayload<unknown>)[],
+  actions: (ThunkAction | ActionFn | ActionFnWithPayload<never>)[],
 ): Operation<Result<LoaderState>[]> {
   const ops = actions.map((action) => () => waitForLoader(loaders, action));
   const group = yield* parallel<LoaderState>(ops);

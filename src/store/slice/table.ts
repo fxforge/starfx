@@ -5,7 +5,7 @@ import type { BaseSchema, SliceState } from "../types.js";
 
 type TableData<Entity> = Record<IdProp, Entity>;
 type TableRootState<Entity> = Record<string, TableData<Entity>>;
-type TableState<Entity> = Immutable<TableRootState<Entity>>;
+type TableSelectorState = Record<string, unknown>;
 type TableDraftState<Entity> = Draft<TableRootState<Entity>>;
 
 interface PropId {
@@ -27,10 +27,7 @@ const isFactory = <T>(value: T | (() => T)): value is () => T =>
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   value !== null && typeof value === "object";
 
-export interface TableSelectors<
-  Entity = unknown,
-  Empty extends EntityOrFactory<Entity> = EntityOrFactory<Entity>,
-> {
+export interface TableSelectors<Entity = unknown> {
   findById: (
     d: Immutable<TableData<Entity>>,
     p: PropId,
@@ -40,39 +37,39 @@ export interface TableSelectors<
     p: PropIds,
   ) => Immutable<Entity>[];
   tableAsList: (d: Immutable<TableData<Entity>>) => Immutable<Entity>[];
-  selectTable: (s: TableState<Entity>) => Immutable<TableData<Entity>>;
-  selectTableAsList: (state: TableState<Entity>) => Immutable<Entity[]>;
-  selectById: (
-    s: TableState<Entity>,
-    p: PropId,
-  ) => Empty extends undefined
-    ? Immutable<Entity> | undefined
-    : Immutable<Entity>;
-  selectByIds: (s: TableState<Entity>, p: PropIds) => Immutable<Entity[]>;
+  selectTable: (s: TableSelectorState) => Immutable<TableData<Entity>>;
+  selectTableAsList: (state: TableSelectorState) => Immutable<Entity[]>;
+  selectById: (s: TableSelectorState, p: PropId) => Immutable<Entity>;
+  selectByIds: (s: TableSelectorState, p: PropIds) => Immutable<Entity[]>;
 }
 
-function tableSelectors<
-  Entity = unknown,
-  Empty extends EntityOrFactory<Entity> | undefined = EntityOrFactory<Entity>,
->(
-  selectTable: (s: TableState<Entity>) => Immutable<TableData<Entity>>,
-  empty: Empty,
-) {
-  const tableAsList = ((data) =>
-    Object.values(data).filter(
-      excludesFalse,
-    )) satisfies TableSelectors<Entity>["tableAsList"];
-  const findById = ((data, { id }) =>
-    data[id]) satisfies TableSelectors<Entity>["findById"];
-  const findByIds = ((data, { ids }) =>
-    ids
-      .map((id) => data[id])
-      .filter(excludesFalse)) satisfies TableSelectors<Entity>["findByIds"];
+function tableSelectors<Entity = unknown>(
+  selectTable: (s: TableSelectorState) => Immutable<TableData<Entity>>,
+  empty: EntityOrFactory<Entity> | undefined,
+): TableSelectors<Entity> {
+  type ResultSelectors = TableSelectors<Entity>;
 
-  const selectById = ((state, { id }) => {
+  const tableAsList: ResultSelectors["tableAsList"] = (data) =>
+    Object.values(data).filter(excludesFalse);
+  const findById: ResultSelectors["findById"] = (data, { id }) => data[id];
+  const findByIds: ResultSelectors["findByIds"] = (data, { ids }) =>
+    ids.map((rowId) => data[rowId]).filter(excludesFalse);
+
+  const selectByIdBase = (state: TableSelectorState, { id }: PropId) => {
     const data = selectTable(state);
     return findById(data, { id });
-  }) satisfies TableSelectors<Entity>["selectById"];
+  };
+
+  const selectById: ResultSelectors["selectById"] = !empty
+    ? (state, { id }) => selectByIdBase(state, { id }) as Immutable<Entity>
+    : (state, { id }) => {
+        if (isFactory(empty)) {
+          return (
+            selectByIdBase(state, { id }) || (empty() as Immutable<Entity>)
+          );
+        }
+        return selectByIdBase(state, { id }) || (empty as Immutable<Entity>);
+      };
 
   return {
     findById,
@@ -80,24 +77,16 @@ function tableSelectors<
     tableAsList,
     selectTable,
     selectTableAsList: createSelector(selectTable, (data) => tableAsList(data)),
-    selectById: !empty
-      ? selectById
-      : (state, { id }) => {
-          if (isFactory(empty)) {
-            return selectById(state, { id }) || (empty() as Immutable<Entity>);
-          }
-          return selectById(state, { id }) || (empty as Immutable<Entity>);
-        },
+    selectById,
     selectByIds: createSelector(
       selectTable,
       (_, p: PropIds) => p.ids,
       (data, ids) => findByIds(data, { ids }),
     ),
-  } satisfies TableSelectors<Entity>;
+  };
 }
 
-export interface TableActions<Entity = unknown> {
-  // actions operate on Draft<TableRootState>
+export interface TableActions<Entity = unknown, Name extends string = string> {
   add: (e: SliceState<Entity>) => (s: TableDraftState<Entity>) => void;
   set: (e: SliceState<Entity>) => (s: TableDraftState<Entity>) => void;
   remove: (ids: IdProp[]) => (s: TableDraftState<Entity>) => void;
@@ -115,9 +104,7 @@ export interface TableOutput<Entity = unknown>
     TableActions<Entity>,
     TableSelectors<Entity> {
   schema: "table";
-  /** runtime initial state for the table slice */
   initialState: Record<IdProp, Entity>;
-  /** default/empty entity value (or factory) */
   empty: Entity | undefined;
 }
 
@@ -126,49 +113,51 @@ export function createTable<Entity = unknown>({
   empty,
   initialState,
 }: {
-  name: keyof TableRootState<Entity>;
+  name: string;
   initialState?: Record<IdProp, Entity>;
   empty?: Entity | (() => Entity);
 }): TableOutput<Entity> {
   const tableInitialState: TableData<Entity> = initialState ?? {};
-  const selectors = tableSelectors<Entity, typeof empty>((s) => s[name], empty);
+  const selectors = tableSelectors<Entity>(
+    (state) => state[name] as Immutable<TableData<Entity>>,
+    empty,
+  );
 
-  const output = {
+  return {
     schema: "table",
-    name,
+    name: String(name),
     initialState: tableInitialState,
     empty: empty === undefined ? undefined : isFactory(empty) ? empty() : empty,
-    add: (entities) => (s) => {
-      const state = s[name];
-      Object.assign(state, entities);
+    add: (entities) => (state) => {
+      const table = state[name];
+      Object.assign(table, entities);
     },
-    set: (entities) => (s) => {
-      const state = s[name];
-      // replace table contents in-place
-      for (const k of Object.keys(state)) delete state[k];
-      Object.assign(state, entities);
+    set: (entities) => (state) => {
+      const table = state[name];
+      for (const key of Object.keys(table)) delete table[key];
+      Object.assign(table, entities);
     },
-    remove: (ids) => (s) => {
-      const state = s[name];
-      for (const id of ids) delete state[id];
+    remove: (ids) => (state) => {
+      const table = state[name];
+      for (const id of ids) delete table[id];
     },
-    patch: (entities) => (s) => {
-      const state = s[name];
+    patch: (entities) => (state) => {
+      const table = state[name];
       for (const id of Object.keys(entities)) {
-        const existing = state[id];
+        const existing = table[id];
         const patch = entities[id];
         if (existing && typeof existing === "object") {
           Object.assign(existing, patch);
         }
       }
     },
-    merge: (entities) => (s) => {
-      const state = s[name];
+    merge: (entities) => (state) => {
+      const table = state[name];
       for (const id of Object.keys(entities)) {
         const src = entities[id];
         if (!src) continue;
         const srcRec: Record<string, unknown> = isRecord(src) ? src : {};
-        const current = state[id];
+        const current = table[id];
         const tgtRec: Record<string, unknown> = isRecord(current)
           ? current
           : {};
@@ -181,18 +170,16 @@ export function createTable<Entity = unknown>({
             tgtRec[prop] = val;
           }
         }
-        Object.assign(state, { [id]: tgtRec });
+        Object.assign(table, { [id]: tgtRec as Entity });
       }
     },
-    reset: () => (s) => {
-      const state = s[name];
-      for (const k of Object.keys(state)) delete state[k];
-      Object.assign(state, tableInitialState);
+    reset: () => (state) => {
+      const table = state[name];
+      for (const key of Object.keys(table)) delete table[key];
+      Object.assign(table, tableInitialState);
     },
     ...selectors,
   } satisfies TableOutput<Entity>;
-
-  return output;
 }
 
 /**

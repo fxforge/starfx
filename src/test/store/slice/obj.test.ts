@@ -28,11 +28,9 @@ test("sets up an obj", async () => {
   const schema = createSchema({
     [NAME]: () => slice,
   });
-  const store = createStore({
-    schemas: [schema],
-  });
+  const store = createStore({ schema });
 
-  await store.initialize(function* () {
+  await store.run(function* () {
     yield* updateStore(
       slice.set({
         username: "bob",
@@ -50,7 +48,7 @@ test("sets up an obj", async () => {
     roles: ["admin", "user"],
   });
 
-  await store.initialize(function* () {
+  await store.run(function* () {
     yield* updateStore(slice.update({ key: "username", value: "alice" }));
   });
 
@@ -61,7 +59,7 @@ test("sets up an obj", async () => {
     roles: ["admin", "user"],
   });
 
-  await store.initialize(function* () {
+  await store.run(function* () {
     yield* updateStore(
       slice.update({ key: "roles", value: ["admin", "superuser"] }),
     );

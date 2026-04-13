@@ -9,8 +9,8 @@ test("react types", () => {
     cache: slice.table(),
     loaders: slice.loaders(),
   });
-  const store = createStore({ schemas: [schema] });
-  React.createElement(Provider, {
+  const store = createStore({ schema });
+  Provider({
     schema,
     store,
     children: React.createElement("div"),

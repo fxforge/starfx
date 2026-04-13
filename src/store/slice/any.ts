@@ -9,7 +9,7 @@ export interface AnyActions<V = unknown> {
 }
 
 export interface AnySelectors<V = unknown> {
-  select: (s: AnyRootState<V>) => Immutable<V>;
+  select: (s: Record<string, unknown>) => Immutable<V>;
 }
 
 // export interface AnyOutput<V, S extends AnyState> extends BaseSchema<V> {
@@ -28,6 +28,9 @@ export interface AnyOutput<V = unknown>
   initialState: V;
 }
 
+const selectValue = <T>(state: Record<string, unknown>, name: string): T =>
+  state[name] as T;
+
 export function createAny<V>({
   name,
   initialState,
@@ -45,7 +48,7 @@ export function createAny<V>({
     reset: () => (state) => {
       Object.assign(state, { [name]: initialState });
     },
-    select: (state) => state[name],
+    select: (state) => selectValue<Immutable<V>>(state, String(name)),
   } satisfies AnyOutput<V>;
 }
 

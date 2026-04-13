@@ -2,8 +2,8 @@ import React, { type ReactElement } from "react";
 import {
   Provider as ReduxProvider,
   useDispatch,
+  useSelector as useReduxSelector,
   useStore as useReduxStore,
-  useSelector,
 } from "react-redux";
 import { getIdFromAction } from "./action.js";
 import type { ThunkAction } from "./query/index.js";
@@ -18,7 +18,7 @@ import type { FxMap, SliceFromSchema } from "./store/types.js";
 import type { AnyState, LoaderState } from "./types.js";
 import type { ActionFn, ActionFnWithPayload } from "./types.js";
 
-export { useDispatch, useSelector } from "react-redux";
+export { useDispatch } from "react-redux";
 export type { TypedUseSelectorHook } from "react-redux";
 
 const {
@@ -31,6 +31,35 @@ const {
 
 type WithLoadersMap = FxMap & { loaders: (n: string) => LoaderOutput };
 type WithCacheMap = FxMap & { cache: (n: string) => TableOutput<AnyState> };
+
+export type TypedHooks<O extends FxMap> = {
+  useSelector: <Selected>(
+    selector: (state: SliceFromSchema<O>) => Selected,
+    equalityFn?: (left: Selected, right: Selected) => boolean,
+  ) => Selected;
+  useStore: () => FxStore<O>;
+  useSchema: () => FxSchema<O>;
+  useSchemaWithLoaders: O extends WithLoadersMap ? () => FxSchema<O> : never;
+  useSchemaWithCache: O extends WithCacheMap ? () => FxSchema<O> : never;
+  useLoader: O extends WithLoadersMap
+    ? <A extends LoaderActionInput = LoaderActionInput>(
+        action: A,
+      ) => LoaderState
+    : never;
+  useApi: O extends WithLoadersMap
+    ? <A extends ApiActionInput>(action: A) => UseApiReturn<A>
+    : never;
+  useQuery: O extends WithLoadersMap
+    ? <P = unknown, A extends ThunkAction<P> = ThunkAction<P>>(
+        action: A,
+      ) => UseApiAction<A>
+    : never;
+  useCache: O extends WithCacheMap
+    ? <P = unknown, ApiSuccess = unknown>(
+        action: ThunkAction<P, ApiSuccess>,
+      ) => UseCacheResult<ApiSuccess, ThunkAction<P, ApiSuccess>>
+    : never;
+};
 
 export interface UseApiProps<P = unknown> extends LoaderState {
   trigger: (p: P) => void;
@@ -65,7 +94,58 @@ type UseApiReturn<A extends ApiActionInput> = A extends ActionFn
       ? UseApiAction<A>
       : never;
 
-const SchemaContext = createContext<FxSchema<FxMap> | null>(null);
+const SchemaContext = createContext<unknown>(null);
+
+export function useSelector<Selected = unknown>(
+  // biome-ignore lint/suspicious/noExplicitAny: bare global useSelector intentionally opts out of state typing.
+  selector: (state: any) => Selected,
+  equalityFn?: (left: Selected, right: Selected) => boolean,
+): Selected;
+export function useSelector<O extends FxMap, Selected = unknown>(
+  selector: (state: SliceFromSchema<O>) => Selected,
+  equalityFn?: (left: Selected, right: Selected) => boolean,
+): Selected;
+export function useSelector(
+  // biome-ignore lint/suspicious/noExplicitAny: implementation signature must be broad enough to cover both typed and untyped overloads.
+  selector: (state: any) => unknown,
+  equalityFn?: (left: unknown, right: unknown) => boolean,
+): unknown {
+  return useReduxSelector(
+    selector as (state: SliceFromSchema<FxMap>) => unknown,
+    equalityFn,
+  );
+}
+
+export function createTypedHooks<O extends FxMap>(
+  _schema: FxSchema<O>,
+): TypedHooks<O> {
+  const useTypedSelector: TypedHooks<O>["useSelector"] = (
+    selector,
+    equalityFn,
+  ) => useSelector<O, ReturnType<typeof selector>>(selector, equalityFn);
+
+  return {
+    useSelector: useTypedSelector,
+    useStore: () => useStore<O>(),
+    useSchema: () => useSchema<O>(),
+    useSchemaWithLoaders: (() =>
+      useSchemaWithLoaders<
+        O & WithLoadersMap
+      >()) as TypedHooks<O>["useSchemaWithLoaders"],
+    useSchemaWithCache: (() =>
+      useSchemaWithCache<
+        O & WithCacheMap
+      >()) as TypedHooks<O>["useSchemaWithCache"],
+    useLoader: ((action) =>
+      useLoader<O & WithLoadersMap>(action)) as TypedHooks<O>["useLoader"],
+    useApi: ((action) =>
+      useApi<O & WithLoadersMap>(action)) as TypedHooks<O>["useApi"],
+    useQuery: ((action) =>
+      useQuery<O & WithLoadersMap>(action)) as TypedHooks<O>["useQuery"],
+    useCache: ((action) =>
+      useCache<O & WithCacheMap>(action)) as TypedHooks<O>["useCache"],
+  };
+}
 
 /**
  * React Provider to wire the `FxStore` and schema into React context.
@@ -100,14 +180,22 @@ const SchemaContext = createContext<FxSchema<FxMap> | null>(null);
  * }
  * ```
  */
-export function Provider<O extends FxMap = FxMap>(props: {
+export function Provider<O extends FxMap>(props: {
   store: FxStore<O>;
   schema?: FxSchema<O>;
+  children?: React.ReactNode;
+}): React.ReactElement;
+
+export function Provider(props: {
+  // biome-ignore lint/suspicious/noExplicitAny: Provider must accept any typed schema/store pair; hook APIs preserve the specific types.
+  store: FxStore<any>;
+  // biome-ignore lint/suspicious/noExplicitAny: Provider must accept any typed schema/store pair; hook APIs preserve the specific types.
+  schema?: FxSchema<any>;
   children?: React.ReactNode;
 }): React.ReactElement {
   const { store, schema, children } = props;
   // Use provided schema or pull from store
-  const schemaValue = (schema ?? store.schema) as FxSchema<FxMap>;
+  const schemaValue = schema ?? store.schema;
   const inner = h(SchemaContext.Provider, { value: schemaValue }, children);
   return h(ReduxProvider, { store, children: inner });
 }
@@ -179,7 +267,7 @@ export function useLoader<
   const schema = useSchemaWithLoaders<O>();
   const id = getIdFromAction(action);
   type LoaderSelectState = Parameters<typeof schema.loaders.selectById>[0];
-  return useSelector((s: SliceFromSchema<O>) =>
+  return useSelector<O, LoaderState>((s) =>
     schema.loaders.selectById(s as unknown as LoaderSelectState, { id }),
   );
 }
@@ -214,9 +302,12 @@ export function useLoader<
  * }
  * ```
  */
-export function useApi<A extends ApiActionInput>(action: A): UseApiReturn<A> {
+export function useApi<
+  O extends WithLoadersMap = WithLoadersMap,
+  A extends ApiActionInput = ApiActionInput,
+>(action: A): UseApiReturn<A> {
   const dispatch = useDispatch();
-  const loader = useLoader(action);
+  const loader = useLoader<O>(action);
   const trigger = (p?: unknown) => {
     if (typeof action === "function") {
       dispatch((action as ActionFnWithPayload<unknown>)(p));
@@ -238,12 +329,10 @@ export function useApi<A extends ApiActionInput>(action: A): UseApiReturn<A> {
  * @returns Loader state and trigger function.
  */
 export function useQuery<
-  P = unknown,
-  A extends ThunkAction<P> = ThunkAction<P>,
->(
-  action: A,
-): UseApiAction<A> {
-  const api = useApi(action) as UseApiAction<A>;
+  O extends WithLoadersMap = WithLoadersMap,
+  A extends ThunkAction = ThunkAction,
+>(action: A): UseApiAction<A> {
+  const api = useApi<O, A>(action) as UseApiAction<A>;
   useEffect(() => {
     api.trigger();
   }, [action.payload.key]);
@@ -277,7 +366,7 @@ export function useCache<
   const schema = useSchemaWithCache<O>();
   const id = action.payload.key;
   type CacheSelectState = Parameters<typeof schema.cache.selectById>[0];
-  const data = useSelector((s: SliceFromSchema<O>) =>
+  const data = useSelector<O, unknown>((s) =>
     schema.cache.selectById(s as unknown as CacheSelectState, { id }),
   );
   const query = useQuery(action);
@@ -336,7 +425,7 @@ export function PersistGate({
 }: PersistGateProps) {
   const schema = useSchemaWithLoaders();
   type LoaderSelectState = Parameters<typeof schema.loaders.selectById>[0];
-  const ldr = useSelector((s: SliceFromSchema<WithLoadersMap>) =>
+  const ldr = useSelector<WithLoadersMap, LoaderState>((s) =>
     schema.loaders.selectById(s as unknown as LoaderSelectState, {
       id: PERSIST_LOADER_ID,
     }),

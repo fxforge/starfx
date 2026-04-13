@@ -11,7 +11,7 @@ export interface NumActions {
 }
 
 export interface NumSelectors {
-  select: (s: Immutable<NumRootState>) => number;
+  select: (s: Record<string, unknown>) => number;
 }
 
 export interface NumOutput
@@ -21,6 +21,9 @@ export interface NumOutput
   schema: "num";
   initialState: number;
 }
+
+const selectValue = <T>(state: Record<string, unknown>, name: string): T =>
+  state[name] as T;
 
 export function createNum({
   name,
@@ -49,7 +52,7 @@ export function createNum({
     reset: () => (state) => {
       state[name] = initialState;
     },
-    select: (state) => state[name],
+    select: (state) => selectValue<number>(state, String(name)),
   } satisfies NumOutput;
 }
 

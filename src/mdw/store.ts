@@ -6,14 +6,17 @@ import {
   select,
   updateStore,
 } from "../store/index.js";
-import type { AnyState, LoaderState, Next } from "../types.js";
+import type { LoaderState, Next } from "../types.js";
 import { nameParser } from "./fetch.js";
 import { actions, customKey, err, queryCtx } from "./query.js";
 
-export interface ApiMdwProps<Ctx extends ApiCtx = ApiCtx> {
+export interface ApiMdwProps<
+  Ctx extends ApiCtx = ApiCtx,
+  CacheEntity = unknown,
+> {
   schema: {
     loaders: LoaderOutput;
-    cache: TableOutput;
+    cache: TableOutput<CacheEntity>;
   };
   errorFn?: (ctx: Ctx) => string;
 }
@@ -59,7 +62,9 @@ function isErrorLike(err: unknown): err is ErrorLike {
  * api.use(mdw.fetch({ baseUrl: 'https://api.example.com' }));
  * ```
  */
-export function api<Ctx extends ApiCtx = ApiCtx>(props: ApiMdwProps<Ctx>) {
+export function api<Ctx extends ApiCtx = ApiCtx, CacheEntity = unknown>(
+  props: ApiMdwProps<Ctx, CacheEntity>,
+) {
   return compose<Ctx>([
     err,
     actions,
@@ -101,8 +106,11 @@ export function api<Ctx extends ApiCtx = ApiCtx>(props: ApiMdwProps<Ctx>) {
  * });
  * ```
  */
-export function cache<Ctx extends ApiCtx = ApiCtx>(schema: {
-  cache: TableOutput;
+export function cache<
+  Ctx extends ApiCtx = ApiCtx,
+  CacheEntity = unknown,
+>(schema: {
+  cache: TableOutput<CacheEntity>;
 }) {
   return function* cache(ctx: Ctx, next: Next) {
     ctx.cacheData = yield* select(schema.cache.selectById, { id: ctx.key });
@@ -242,10 +250,10 @@ function defaultErrorFn<Ctx extends ApiCtx = ApiCtx>(ctx: Ctx) {
  * @param props.errorFn - Custom function to extract error message from context.
  * @returns A loader tracking middleware function.
  */
-export function loaderApi<Ctx extends ApiCtx = ApiCtx>({
+export function loaderApi<Ctx extends ApiCtx = ApiCtx, CacheEntity = unknown>({
   schema,
   errorFn = defaultErrorFn,
-}: ApiMdwProps<Ctx>) {
+}: ApiMdwProps<Ctx, CacheEntity>) {
   return function* trackLoading(ctx: Ctx, next: Next) {
     try {
       yield* updateStore([

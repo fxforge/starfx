@@ -24,11 +24,9 @@ test("sets up a table", async () => {
   const schema = createSchema({
     [NAME]: () => tableSlice,
   });
-  const store = createStore({
-    schemas: [schema],
-  });
+  const store = createStore({ schema });
 
-  await store.initialize(function* () {
+  await store.run(function* () {
     yield* updateStore(tableSlice.set({ [first.id]: first }));
   });
   expect(store.getState()[NAME]).toEqual({ [first.id]: first });
@@ -38,11 +36,9 @@ test("adds a row", async () => {
   const schema = createSchema({
     [NAME]: () => tableSlice,
   });
-  const store = createStore({
-    schemas: [schema],
-  });
+  const store = createStore({ schema });
 
-  await store.initialize(function* () {
+  await store.run(function* () {
     yield* updateStore(tableSlice.set({ [second.id]: second }));
   });
   expect(store.getState()[NAME]).toEqual({ 2: second });
@@ -52,12 +48,10 @@ test("removes a row", async () => {
   const schema = createSchema({
     [NAME]: () => tableSlice,
   });
-  const store = createStore({
-    schemas: [schema],
-  });
+  const store = createStore({ schema });
 
   // Pre-populate the store
-  await store.initialize(function* () {
+  await store.run(function* () {
     yield* updateStore(
       tableSlice.set({ [first.id]: first, [second.id]: second }),
     );
@@ -71,10 +65,8 @@ test("updates a row", async () => {
   const schema = createSchema({
     [NAME]: () => tableSlice,
   });
-  const store = createStore({
-    schemas: [schema],
-  });
-  await store.initialize(function* () {
+  const store = createStore({ schema });
+  await store.run(function* () {
     const updated = { id: second.id, user: "BB" };
     yield* updateStore(tableSlice.set({ [second.id]: second }));
     yield* updateStore(tableSlice.patch({ [updated.id]: updated }));
@@ -88,10 +80,8 @@ test("gets a row", async () => {
   const schema = createSchema({
     [NAME]: () => tableSlice,
   });
-  const store = createStore({
-    schemas: [schema],
-  });
-  await store.initialize(function* () {
+  const store = createStore({ schema });
+  await store.run(function* () {
     yield* updateStore(
       tableSlice.add({
         [first.id]: first,
@@ -109,9 +99,7 @@ test("when the record doesnt exist, it returns empty record", () => {
   const schema = createSchema({
     [NAME]: () => tableSlice,
   });
-  const store = createStore({
-    schemas: [schema],
-  });
+  const store = createStore({ schema });
 
   const row = tableSlice.selectById(store.getState(), { id: "2" });
   expect(row).toEqual(empty);
@@ -121,11 +109,9 @@ test("gets all rows", async () => {
   const schema = createSchema({
     [NAME]: () => tableSlice,
   });
-  const store = createStore({
-    schemas: [schema],
-  });
+  const store = createStore({ schema });
   const data = { [first.id]: first, [second.id]: second, [third.id]: third };
-  await store.initialize(function* () {
+  await store.run(function* () {
     yield* updateStore(tableSlice.add(data));
   });
   expect(store.getState()[NAME]).toEqual(data);
@@ -137,12 +123,10 @@ test("with empty", async () => {
   const schema = createSchema({
     users: () => tbl,
   });
-  const store = createStore({
-    schemas: [schema],
-  });
+  const store = createStore({ schema });
 
   expect(tbl.empty).toEqual(first);
-  await store.initialize(function* () {
+  await store.run(function* () {
     yield* updateStore(tbl.set({ [first.id]: first }));
   });
   expect(tbl.selectTable(store.getState())).toEqual({
@@ -158,12 +142,10 @@ test("with no empty", async () => {
   const schema = createSchema({
     users: () => tbl,
   });
-  const store = createStore({
-    schemas: [schema],
-  });
+  const store = createStore({ schema });
 
   expect(tbl.empty).toEqual(undefined);
-  await store.initialize(function* () {
+  await store.run(function* () {
     yield* updateStore(tbl.set({ [first.id]: first }));
   });
   expect(tbl.selectTable(store.getState())).toEqual({

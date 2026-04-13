@@ -29,7 +29,7 @@ const emptyUser: User = { id: "", name: "", email: "" };
 const mockUser: User = { id: "1", name: "test", email: "test@test.com" };
 const mockUser2: User = { id: "2", name: "two", email: "two@test.com" };
 
-const jsonBlob = (data: any) => {
+const jsonBlob = (data: unknown) => {
   return JSON.stringify(data);
 };
 
@@ -39,7 +39,7 @@ const testStore = () => {
     loaders: slice.loaders(),
     cache: slice.table({ empty: {} }),
   });
-  const store = createStore({ schemas: [schema] });
+  const store = createStore({ schema });
   return { schema, store };
 };
 

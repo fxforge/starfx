@@ -47,7 +47,7 @@ test("can persist to storage adapters", async () => {
     },
     { middleware: [mdw] },
   );
-  const store = createStore({ schemas: [schema] });
+  const store = createStore({ schema });
 
   await store.run(function* (): Operation<void> {
     yield* persistor.rehydrate();
@@ -103,7 +103,7 @@ test("rehydrates state", async () => {
     },
     { middleware: [mdw] },
   );
-  const store = createStore({ schemas: [schema] });
+  const store = createStore({ schema });
 
   await store.run(function* (): Operation<void> {
     yield* persistor.rehydrate();
@@ -159,7 +159,7 @@ test("persists inbound state using transform 'in' function", async () => {
     },
     { middleware: [mdw] },
   );
-  const store = createStore({ schemas: [schema] });
+  const store = createStore({ schema });
 
   await store.run(function* (): Operation<void> {
     yield* persistor.rehydrate();
@@ -231,7 +231,7 @@ test("persists inbound state using tranform in (2)", async () => {
     { middleware: [mdw] },
   );
   type State = typeof schema.initialState;
-  const store = createStore({ schemas: [schema] });
+  const store = createStore({ schema });
 
   await store.run(function* (): Operation<void> {
     yield* persistor.rehydrate();
@@ -283,10 +283,10 @@ test("persists a filtered nested part of a slice", async () => {
 
     if (state.loaders) {
       const maxLastRun: Record<string, number> = {};
-      const entryWithMaxLastRun: Record<string, LoaderItemState<any>> = {};
+      const entryWithMaxLastRun: Record<string, LoaderItemState> = {};
 
       for (const entryKey in state.loaders) {
-        const entry = state.loaders[entryKey] as LoaderItemState<any>;
+        const entry = state.loaders[entryKey] as LoaderItemState;
         const sliceName = entryKey.split("[")[0].trim();
         if (sliceName.includes("A") || sliceName.includes("C")) {
           if (!maxLastRun[sliceName] || entry.lastRun > maxLastRun[sliceName]) {
@@ -318,7 +318,7 @@ test("persists a filtered nested part of a slice", async () => {
     { middleware: [mdw] },
   );
   type State = typeof schema.initialState;
-  const store = createStore({ schemas: [schema] });
+  const store = createStore({ schema });
 
   await store.run(function* (): Operation<void> {
     yield* persistor.rehydrate();
@@ -394,7 +394,7 @@ test("handles the empty state correctly", async () => {
   });
 
   const mdw = persistStoreMdw(persistor);
-  const store = createStore({ schemas: [schema] });
+  const store = createStore({ schema });
 
   await store.run(function* (): Operation<void> {
     yield* persistor.rehydrate();
@@ -439,7 +439,7 @@ test("in absence of the inbound transformer, persists as it is", async () => {
     },
     { middleware: [mdw] },
   );
-  const store = createStore({ schemas: [schema] });
+  const store = createStore({ schema });
 
   await store.run(function* (): Operation<void> {
     yield* persistor.rehydrate();
@@ -492,7 +492,7 @@ test("handles errors gracefully, defaluts to identity function", async () => {
     transform,
   });
   const mdw = persistStoreMdw(persistor);
-  const store = createStore({ schemas: [schema] });
+  const store = createStore({ schema });
 
   const err = console.error;
   console.error = () => {};
@@ -550,7 +550,7 @@ test("allowdList is filtered out after the inbound  transformer is applied", asy
     },
     { middleware: [mdw] },
   );
-  const store = createStore({ schemas: [schema] });
+  const store = createStore({ schema });
 
   await store.run(function* (): Operation<void> {
     yield* persistor.rehydrate();
@@ -606,7 +606,7 @@ test("the inbound transformer can be redifined during runtime", async () => {
     { middleware: [mdw] },
   );
   type State = typeof schema.initialState;
-  const store = createStore({ schemas: [schema] });
+  const store = createStore({ schema });
 
   await store.run(function* (): Operation<void> {
     yield* persistor.rehydrate();
@@ -665,7 +665,7 @@ test("persists state using transform 'out' function", async () => {
   });
 
   const mdw = persistStoreMdw(persistor);
-  const store = createStore({ schemas: [schema] });
+  const store = createStore({ schema });
 
   await store.run(function* (): Operation<void> {
     yield* persistor.rehydrate();
@@ -729,7 +729,7 @@ test("persists outbound state using tranform setOutTransformer", async () => {
     { middleware: [mdw] },
   );
   type State = typeof schema.initialState;
-  const store = createStore({ schemas: [schema] });
+  const store = createStore({ schema });
 
   await store.run(function* (): Operation<void> {
     yield* persistor.rehydrate();
@@ -783,7 +783,7 @@ test("persists outbound a filtered nested part of a slice", async () => {
   });
 
   const mdw = persistStoreMdw(persistor);
-  const store = createStore({ schemas: [schema] });
+  const store = createStore({ schema });
 
   await store.run(function* (): Operation<void> {
     yield* persistor.rehydrate();
@@ -829,7 +829,7 @@ test("the outbound transformer can be reset during runtime", async () => {
   const transform = createTransform<TestState6>();
   transform.out = revertToken;
 
-  const persistor = createPersistor<any>({
+  const persistor = createPersistor<TestState6>({
     adapter,
     allowlist: ["token"],
     transform,
@@ -846,7 +846,7 @@ test("the outbound transformer can be reset during runtime", async () => {
     { middleware: [mdw] },
   );
   type State = typeof schema.initialState;
-  const store = createStore({ schemas: [schema] });
+  const store = createStore({ schema });
 
   await store.run(function* (): Operation<void> {
     yield* persistor.rehydrate();

@@ -29,8 +29,11 @@ export type Listener = () => void;
 /**
  * Context passed to store update middleware.
  */
-export interface UpdaterCtx<S extends AnyState> extends BaseCtx {
-  updater: StoreUpdater<S> | StoreUpdater<S>[];
+export interface UpdaterCtx<
+  S extends AnyState,
+  U = StoreUpdater<S> | StoreUpdater<S>[],
+> extends BaseCtx {
+  updater: U;
   patches: Patch[];
 }
 
@@ -80,6 +83,25 @@ export type SliceFromSchema<O extends FxMap> = {
   [K in keyof O]: FactoryInitial<O[K]>;
 };
 
+type SliceActionUpdater<T> = {
+  [K in keyof T]: T[K] extends (...args: never[]) => infer R
+    ? R extends StoreUpdater<AnyState>
+      ? R
+      : never
+    : never;
+}[keyof T];
+
+type BuiltInSchemaUpdater =
+  | SliceActionUpdater<LoaderOutput>
+  | SliceActionUpdater<TableOutput<AnyState>>;
+
+export type SchemaUpdater<O extends FxMap> =
+  | StoreUpdater<SliceFromSchema<O>>
+  | BuiltInSchemaUpdater
+  | {
+      [K in keyof O]: SliceActionUpdater<ReturnType<NonNullable<O[K]>>>;
+    }[keyof O];
+
 /**
  * Generated schema type mapping slice factories to runtime slice helpers.
  *
@@ -87,17 +109,21 @@ export type SliceFromSchema<O extends FxMap> = {
  * Extends generated helpers with schema lifecycle/update APIs.
  */
 export type FxSchema<O extends FxMap = FxMap> = {
-  [key in keyof O]: ReturnType<NonNullable<O[key]>>;
+  [K in keyof O]: FactoryReturn<NonNullable<O[K]>>;
 } & {
   name: string;
   initialize?: () => Operation<void>;
   update: (
-    u: StoreUpdater<SliceFromSchema<O>> | StoreUpdater<SliceFromSchema<O>>[],
-  ) => Operation<UpdaterCtx<SliceFromSchema<O>>>;
+    u: SchemaUpdater<O> | SchemaUpdater<O>[],
+  ) => Operation<
+    UpdaterCtx<SliceFromSchema<O>, SchemaUpdater<O> | SchemaUpdater<O>[]>
+  >;
   initialState: SliceFromSchema<O>;
   reset: <K extends keyof SliceFromSchema<O> = keyof SliceFromSchema<O>>(
     ignoreList?: K[],
-  ) => Operation<UpdaterCtx<SliceFromSchema<O>>>;
+  ) => Operation<
+    UpdaterCtx<SliceFromSchema<O>, SchemaUpdater<O> | SchemaUpdater<O>[]>
+  >;
 };
 
 /**
@@ -122,7 +148,6 @@ export interface FxStore<O extends FxMap> {
     resource: Operation<Resource>,
   ) => Context<Resource>;
   run: ReturnType<typeof createRun>;
-  initialize: <T>(op: () => Operation<T>) => Task<void>;
   // part of redux store API
   dispatch: (a: AnyAction | AnyAction[]) => unknown;
   // part of redux store API

@@ -38,7 +38,7 @@ const testStore = () => {
     loaders: slice.loaders(),
     cache: slice.table({ empty: {} }),
   });
-  const store = createStore({ schemas: [schema] });
+  const store = createStore({ schema });
   return { schema, store };
 };
 
@@ -103,7 +103,7 @@ test("POST", async () => {
   const schema = createSchema({
     users: slice.table<User>(),
   });
-  const store = createStore({ schemas: [schema] });
+  const store = createStore({ schema });
   store.run(query.register);
 
   store.dispatch(createUser({ email: mockUser.email }));
@@ -268,10 +268,13 @@ test("run() from a normal saga", async () => {
   const payload = { name: "/users/:id [GET]", options: { id: "1" } };
 
   expect(extractedResults.actionType).toEqual(`${API_ACTION_PREFIX}${action1}`);
-  expect((extractedResults.actionPayload as any).name).toEqual(payload.name);
-  expect((extractedResults.actionPayload as any).options).toEqual(
-    payload.options,
-  );
+  expect(
+    (extractedResults.actionPayload as unknown as { name: string }).name,
+  ).toEqual(payload.name);
+  expect(
+    (extractedResults.actionPayload as unknown as { options: { id: string } })
+      .options,
+  ).toEqual(payload.options);
   expect(extractedResults.name).toEqual("/users/:id [GET]");
   expect(extractedResults.payload).toEqual({ id: "1" });
   expect(acc).toEqual("ab");
@@ -368,6 +371,7 @@ test("two identical endpoints", () => {
   expect(actual).toEqual(["/health", "/health"]);
 });
 
+// biome-ignore lint/suspicious/noExplicitAny: test helper should mirror ApiCtx defaults
 interface TestCtx<P = any, S = any> extends ApiCtx<P, S, { message: string }> {
   something: boolean;
 }
@@ -442,6 +446,7 @@ test("ensure ability to cast `ctx` in function definition", () => {
   expect(acc).toEqual(["1", "wow"]);
 });
 
+// biome-ignore lint/suspicious/noExplicitAny: test helper should mirror ApiCtx defaults
 type FetchUserSecondCtx = TestCtx<any, { result: string }>;
 
 // this is strictly for testing types
@@ -476,7 +481,7 @@ test("ensure ability to cast `ctx` in function definition with no props", () => 
 });
 
 test("should bubble up error", () => {
-  let error: any = null;
+  let error: unknown = null;
   const { store } = testStore();
   const api = createApi();
   api.use(function* (_, next) {
@@ -493,14 +498,18 @@ test("should bubble up error", () => {
     "/users/8",
     { supervisor: takeEvery },
     function* (ctx, _) {
-      (ctx.loader as any).meta = { key: ctx.payload.thisKeyDoesNotExist };
+      if (!ctx.loader) {
+        ctx.loader = {};
+      }
+      ctx.loader.meta = { key: ctx.payload.thisKeyDoesNotExist };
       throw new Error("GENERATING AN ERROR");
     },
   );
 
   store.run(api.register);
   store.dispatch(fetchUser());
-  expect(error.message).toBe(
+  expect(error).toBeInstanceOf(Error);
+  expect((error as Error).message).toBe(
     "Cannot read properties of undefined (reading 'thisKeyDoesNotExist')",
   );
 });

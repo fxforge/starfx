@@ -84,9 +84,10 @@ export function defaultLoader(l: Partial<LoaderItemState> = {}): LoaderState {
       loading.lastSuccess === 0,
   };
 }
+
 type LoaderTable = Record<string, LoaderItemState>;
 type LoaderRootState = Record<string, LoaderTable>;
-type LoaderStateView = Immutable<LoaderRootState>;
+type LoaderStateView = Record<string, unknown>;
 type LoaderDraftState = Draft<LoaderRootState>;
 
 export interface LoaderSelectors {
@@ -98,16 +99,16 @@ export interface LoaderSelectors {
   selectByIds: (s: LoaderStateView, p: PropIds) => LoaderState[];
 }
 
-function loaderSelectors(selectTable: LoaderSelectors["selectTable"]) {
-  const findById = ((data, { id }) =>
-    defaultLoader(data[id])) satisfies LoaderSelectors["findById"];
+function loaderSelectors(
+  selectTable: LoaderSelectors["selectTable"],
+): LoaderSelectors {
+  const findById: LoaderSelectors["findById"] = (data, { id }) =>
+    defaultLoader(data[id]);
 
-  const findByIds = ((data, { ids }) =>
-    ids
-      .map((id) => defaultLoader(data[id]))
-      .filter(excludesFalse)) satisfies LoaderSelectors["findByIds"];
+  const findByIds: LoaderSelectors["findByIds"] = (data, { ids }) =>
+    ids.map((id) => defaultLoader(data[id])).filter(excludesFalse);
 
-  const selectors = {
+  return {
     findById,
     findByIds,
     selectTable,
@@ -123,8 +124,6 @@ function loaderSelectors(selectTable: LoaderSelectors["selectTable"]) {
       (data, ids) => findByIds(data, { ids }),
     ),
   } satisfies LoaderSelectors;
-
-  return selectors;
 }
 
 export interface LoaderActions {
@@ -149,18 +148,20 @@ export const createLoaders = ({
   name,
   initialState = {},
 }: {
-  name: keyof LoaderRootState;
+  name: string;
   initialState?: LoaderTable;
 }): LoaderOutput => {
   const loaderInitialState = initialState ?? {};
-  const selectors = loaderSelectors((s) => s[name]);
+  const selectors = loaderSelectors(
+    (state) => state[name] as Immutable<LoaderTable>,
+  );
 
-  const output = {
+  return {
     schema: "loader",
     name: String(name),
     initialState: loaderInitialState,
-    start: (e) => (s) => {
-      const table = s[name];
+    start: (e) => (state) => {
+      const table = state[name];
       const loader = table[e.id];
       table[e.id] = defaultLoaderItem({
         ...loader,
@@ -169,8 +170,8 @@ export const createLoaders = ({
         lastRun: ts(),
       });
     },
-    success: (e) => (s) => {
-      const table = s[name];
+    success: (e) => (state) => {
+      const table = state[name];
       const loader = table[e.id];
       table[e.id] = defaultLoaderItem({
         ...loader,
@@ -179,8 +180,8 @@ export const createLoaders = ({
         lastSuccess: ts(),
       });
     },
-    error: (e) => (s) => {
-      const table = s[name];
+    error: (e) => (state) => {
+      const table = state[name];
       const loader = table[e.id];
       table[e.id] = defaultLoaderItem({
         ...loader,
@@ -188,21 +189,19 @@ export const createLoaders = ({
         status: "error",
       });
     },
-    reset: () => (s) => {
-      const table = s[name];
+    reset: () => (state) => {
+      const table = state[name];
       for (const key of Object.keys(table)) delete table[key];
       Object.assign(table, loaderInitialState);
     },
-    resetByIds: (ids: string[]) => (s) => {
-      const table = s[name];
+    resetByIds: (ids: string[]) => (state) => {
+      const table = state[name];
       ids.forEach((id) => {
         delete table[id];
       });
     },
     ...selectors,
   } satisfies LoaderOutput;
-
-  return output;
 };
 
 /**

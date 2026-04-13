@@ -17,15 +17,13 @@ test("should batch notify subscribers based on mdw", async () => {
       middleware: [createBatchMdw(queueMicrotask)],
     },
   );
-  const store = createStore({
-    schemas: [schema],
-  });
+  const store = createStore({ schema });
   let counter = 0;
   store.subscribe(() => {
     counter += 1;
   });
   await store.run(function* () {
-    const group: any = yield* parallel([
+    const group = yield* parallel([
       () => schema.update(schema.cache.add({ "1": "one" })),
       () => schema.update(schema.cache.add({ "2": "two" })),
       () => schema.update(schema.cache.add({ "3": "three" })),

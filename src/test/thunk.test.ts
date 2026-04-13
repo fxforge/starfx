@@ -16,27 +16,13 @@ import {
 } from "../store/index.js";
 import { describe, expect, test } from "../test.js";
 
-import type {
-  CreateAction,
-  CreateActionWithPayload,
-  Next,
-  Operation,
-  ThunkCtx,
-} from "../index.js";
-import type { IfAny } from "../query/types.js";
+import type { Next, Operation, ThunkCtx } from "../index.js";
 
+// biome-ignore lint/suspicious/noExplicitAny: matches ThunkCtx<any> default required by createThunks<RoboCtx>()
 interface RoboCtx<D = Record<string, unknown>, P = any> extends ThunkCtx<P> {
   url: string;
   request: { method: string; body?: Record<string, unknown> };
   response: D;
-  name: string;
-  key: string;
-  action: any;
-  actionFn: IfAny<
-    P,
-    CreateAction<ThunkCtx<any>, any>,
-    CreateActionWithPayload<ThunkCtx<P>, P, any>
-  >;
 }
 
 interface User {
@@ -159,7 +145,7 @@ test("when create a query fetch pipeline - execute all middleware and save to re
     users: slice.table<User>({ empty: { id: "", name: "", email: "" } }),
     tickets: slice.table<Ticket>({ empty: { id: "", name: "" } }),
   });
-  const store = createStore({ schemas: [schema] });
+  const store = createStore({ schema });
   store.run(api.register);
 
   store.dispatch(fetchUsers());
@@ -203,7 +189,7 @@ test("when providing a generator the to api.create function - should call that g
     users: slice.table<User>({ empty: { id: "", name: "", email: "" } }),
     tickets: slice.table<Ticket>({ empty: { id: "", name: "" } }),
   });
-  const store = createStore({ schemas: [schema] });
+  const store = createStore({ schema });
   store.run(api.register);
 
   store.dispatch(fetchTickets());
@@ -217,7 +203,7 @@ test("when providing a generator the to api.create function - should call that g
 
 test("error handling", () => {
   expect.assertions(1);
-  let called;
+  let called = false;
   const api = createThunks<RoboCtx>();
   api.use(api.routes());
   api.use(function* upstream(_, next) {

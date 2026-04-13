@@ -9,7 +9,7 @@ export interface StrActions {
 }
 
 export interface StrSelectors {
-  select: (s: Immutable<StrRootState>) => string;
+  select: (s: Record<string, unknown>) => string;
 }
 
 export interface StrOutput
@@ -19,6 +19,9 @@ export interface StrOutput
   schema: "str";
   initialState: string;
 }
+
+const selectValue = <T>(state: Record<string, unknown>, name: string): T =>
+  state[name] as T;
 
 export function createStr({
   name,
@@ -37,7 +40,7 @@ export function createStr({
     reset: () => (state) => {
       state[name] = initialState;
     },
-    select: (state) => state[name],
+    select: (state) => selectValue<string>(state, String(name)),
   } satisfies StrOutput;
 }
 

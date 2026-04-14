@@ -9,19 +9,9 @@ import "./index.css";
 init();
 
 function init() {
-  const store = createStore({ schemas: [schema] });
+  const store = createStore({ schema, tasks: [logger, api.register] });
   // makes `fx` available in devtools
   (window as any).fx = store;
-
-  store.run([
-    function* logger() {
-      while (true) {
-        const action = yield* take("*");
-        console.log("action", action);
-      }
-    },
-    api.register,
-  ]);
 
   ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
     <React.StrictMode>
@@ -30,4 +20,11 @@ function init() {
       </Provider>
     </React.StrictMode>
   );
+}
+
+function* logger() {
+  while (true) {
+    const action = yield* take("*");
+    console.log("action", action);
+  }
 }

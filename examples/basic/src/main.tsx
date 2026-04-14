@@ -1,11 +1,21 @@
 import ReactDOM from "react-dom/client";
-import { createApi, createSchema, createStore, mdw, timer } from "starfx";
+import {
+  createApi,
+  createSchema,
+  createStore,
+  mdw,
+  slice,
+  timer,
+} from "starfx";
 import { Provider, useCache } from "starfx/react";
 
-const schema = createSchema();
-const store = createStore({ schemas: [schema] });
-
 const api = createApi();
+const schema = createSchema({
+  cache: slice.table(),
+  loaders: slice.loaders(),
+});
+const store = createStore({ schema, tasks: [api.register] });
+
 // mdw = middleware
 api.use(mdw.api({ schema }));
 api.use(api.routes());
@@ -17,14 +27,8 @@ const fetchRepo = api.get(
   api.cache()
 );
 
-store.run(api.register);
-
 function App() {
-  return (
-    <Provider store={store}>
-      <Example />
-    </Provider>
-  );
+  return <Example />;
 }
 
 function Example() {

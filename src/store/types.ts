@@ -1,6 +1,6 @@
-import type { Context, Operation, Scope, Task } from "effection";
+import type { Context, Operation, Scope } from "effection";
 import type { Draft, Immutable, Patch } from "immer";
-import type { BaseCtx, BaseMiddleware } from "../index.js";
+import type { BaseCtx } from "../index.js";
 import type { AnyAction, AnyState } from "../types.js";
 import type { createRun } from "./run.js";
 import type { LoaderOutput } from "./slice/loaders.js";

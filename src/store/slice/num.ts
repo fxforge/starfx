@@ -1,4 +1,4 @@
-import type { Draft, Immutable } from "immer";
+import type { Draft } from "immer";
 import type { BaseSchema, SliceState } from "../types.js";
 
 type NumRootState = SliceState<number>;

@@ -12,6 +12,7 @@
     "test": "vitest --exclude examples",
     "typecheck": "tsc --noEmit",
     "typecheck:lib": "tsc --noEmit --project tsconfig.lib.json",
+    "typecheck:examples": "tsc --noEmit -p examples/basic/tsconfig.json && tsc --noEmit -p examples/vite-react/tsconfig.json && tsc --noEmit -p examples/yjs/tsconfig.json && tsc --noEmit -p examples/tests-rtl/tsconfig.json",
     "lint": "biome check --write",
     "fmt": "biome check --write --linter-enabled=false",
     "ci": "biome ci .",

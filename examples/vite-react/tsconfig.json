@@ -1,5 +1,8 @@
 {
   "compilerOptions": {
+    "baseUrl": ".",
+    "forceConsistentCasingInFileNames": true,
+    "ignoreDeprecations": "5.0",
     "target": "ESNext",
     "lib": ["DOM", "DOM.Iterable", "ESNext"],
     "module": "ESNext",
@@ -12,6 +15,10 @@
     "isolatedModules": true,
     "noEmit": true,
     "jsx": "react-jsx",
+    "paths": {
+      "starfx": ["../../src/index.ts"],
+      "starfx/react": ["../../src/react.ts"]
+    },
 
     /* Linting */
     "strict": true,

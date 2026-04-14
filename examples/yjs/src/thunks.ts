@@ -1,5 +1,6 @@
 import { createThunks, mdw } from "starfx";
 import { createSchema } from "./store/schema.js";
+import { createTypedHooks } from "starfx/react";
 
 export const schema = createSchema({});
 export type AppState = typeof schema.initialState;
@@ -9,14 +10,22 @@ export const thunks = createThunks();
 thunks.use(mdw.err);
 // where all the thunks get called in the middleware stack
 thunks.use(thunks.routes());
-thunks.use(function* (ctx, next) {
+thunks.use(function* (_ctx, next) {
   console.log("last mdw in the stack");
   yield* next();
 });
 
+type YjsRoot = {
+  get(key: "data"): {
+    get(key: "items"): {
+      push(items: Array<{ id: string; name: string; children: unknown[] }>): void;
+    };
+  };
+};
+
 export const createFolder = thunks.create<any>("/users", function* (ctx, next) {
   console.log("Creating folder", ctx);
-  yield* schema.update((root) => {
+  yield* schema.update(((root: YjsRoot) => {
     const yarray = root.get("data").get("items");
     yarray.push([
       {
@@ -25,7 +34,10 @@ export const createFolder = thunks.create<any>("/users", function* (ctx, next) {
         children: [],
       },
     ]);
-  });
+  }) as never);
 
   yield* next();
 });
+
+export const { useSelector } = createTypedHooks(schema);
+

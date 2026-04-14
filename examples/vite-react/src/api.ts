@@ -1,5 +1,6 @@
 import { createApi, createSchema, mdw, slice } from "starfx";
 import { guessAge } from "./age-guess";
+import { createTypedHooks } from "starfx/react";
 
 interface User {
   id: string;
@@ -13,7 +14,6 @@ export const schema = createSchema({
   cache: slice.table(),
   loaders: slice.loaders(),
 });
-export type AppState = typeof schema.initialState;
 
 export const api = createApi();
 api.use(mdw.api({ schema }));
@@ -49,3 +49,6 @@ export const fetchUsers = api.get<never, Omit<User, "age">[]>(
     yield* schema.update(schema.users.add(users));
   }
 );
+
+export const { useSelector } = createTypedHooks(schema);
+

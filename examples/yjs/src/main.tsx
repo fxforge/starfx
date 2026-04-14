@@ -10,20 +10,11 @@ init();
 
 function init() {
   const store = createStore({
-    schemas: [schema],
+    schema,
+    tasks: [logger, thunks.register],
   });
   // makes `fx` available in devtools
   (window as any).fx = store;
-
-  store.initialize([
-    function* logger() {
-      while (true) {
-        const action = yield* take("*");
-        console.log("action", action);
-      }
-    },
-    thunks.register,
-  ]);
 
   ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
     <React.StrictMode>
@@ -32,4 +23,11 @@ function init() {
       </Provider>
     </React.StrictMode>
   );
+}
+
+function* logger() {
+  while (true) {
+    const action = yield* take("*");
+    console.log("action", action);
+  }
 }

@@ -86,7 +86,7 @@ function tableSelectors<Entity = unknown>(
   };
 }
 
-export interface TableActions<Entity = unknown, Name extends string = string> {
+export interface TableActions<Entity = unknown> {
   add: (e: SliceState<Entity>) => (s: TableDraftState<Entity>) => void;
   set: (e: SliceState<Entity>) => (s: TableDraftState<Entity>) => void;
   remove: (ids: IdProp[]) => (s: TableDraftState<Entity>) => void;

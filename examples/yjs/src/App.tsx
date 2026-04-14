@@ -1,12 +1,8 @@
 import {
-  TypedUseSelectorHook,
   useDispatch,
-  useSelector as useSel,
 } from "starfx/react";
 import "./App.css";
-import { AppState, createFolder, schema } from "./thunks.js";
-
-const useSelector: TypedUseSelectorHook<AppState> = useSel;
+import { createFolder, useSelector } from "./thunks.js";
 
 function App({ id }: { id: string }) {
   const dispatch = useDispatch();

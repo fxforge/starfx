@@ -1,4 +1,3 @@
-import React from "react";
 import "@testing-library/jest-dom";
 import { expect, test } from "@jest/globals";
 import { fireEvent, render, screen, waitFor } from "./utils";

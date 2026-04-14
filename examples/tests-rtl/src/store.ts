@@ -2,11 +2,11 @@ import { api, schema } from "./api";
 import { createStore } from "starfx";
 
 export function setupStore({ initialState = {} } = {}) {
+  void initialState;
   const store = createStore({
-    schemas: [schema],
+    schema,
+    tasks: [api.register],
   });
-
-  store.run(api.register);
 
   return store;
 }

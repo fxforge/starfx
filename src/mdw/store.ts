@@ -6,7 +6,7 @@ import {
   select,
   updateStore,
 } from "../store/index.js";
-import type { LoaderState, Next } from "../types.js";
+import type { Next } from "../types.js";
 import { nameParser } from "./fetch.js";
 import { actions, customKey, err, queryCtx } from "./query.js";
 

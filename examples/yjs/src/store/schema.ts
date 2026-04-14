@@ -1,10 +1,9 @@
 import {
   type FxMap,
   type FxSchema,
-  type Next,
-  type UpdaterCtx,
-  type FxStore,
   createSchemaWithUpdater,
+  expectStore,
+  type SliceFromSchema,
 } from "starfx";
 import * as Y from "yjs";
 
@@ -14,8 +13,7 @@ import * as Y from "yjs";
  */
 export function createYjsSchema<
   O extends FxMap,
-  S extends { [key in keyof O]: ReturnType<O[key]>["initialState"] },
->(slices: O): FxSchema<S, O> {
+>(slices: O): FxSchema<O> {
   console.log("Creating Y.Doc");
   const ydoc = new Y.Doc({ autoLoad: true });
   const root = ydoc.getMap();
@@ -25,34 +23,29 @@ export function createYjsSchema<
   data.set("items", new Y.Array());
 
   return createSchemaWithUpdater(slices, {
-    createUpdateMdw: (store: FxStore<S>) => {
-      // Set up observer to sync Y.Doc changes to store
-      root.observeDeep(
-        (events: Y.YEvent<any>[], transaction: Y.Transaction) => {
-          console.log("Y.Doc changed", { events, transaction });
-          store.setState(root.toJSON() as S);
-        },
-      );
+    initialize: function* () {
+      const store = yield* expectStore<O>();
 
-      // Initialize store with current Y.Doc state
-      store.setState(root.toJSON() as S);
+      root.observeDeep((_events: Y.YEvent<unknown>[], _transaction: Y.Transaction) => {
+        store.setState(root.toJSON() as SliceFromSchema<O>);
+      });
 
-      return function* updateMdw(ctx: UpdaterCtx<S>, next: Next) {
-        ydoc.transact(() => {
-          const updaters = Array.isArray(ctx.updater)
-            ? ctx.updater
-            : [ctx.updater];
-          for (const updater of updaters) {
-            updater(root as any);
-          }
-        });
-        console.log({ updater: ctx.updater });
-        store.setState(root.toJSON() as S);
-        yield* next();
-      };
+      store.setState(root.toJSON() as SliceFromSchema<O>);
+    },
+    *updateMdw(ctx, next) {
+      const store = yield* expectStore<O>();
+
+      ydoc.transact(() => {
+        const updaters = Array.isArray(ctx.updater)
+          ? ctx.updater
+          : [ctx.updater];
+        for (const updater of updaters) {
+          (updater as (root: Y.Map<unknown>) => void)(root);
+        }
+      });
+
+      store.setState(root.toJSON() as SliceFromSchema<O>);
+      yield* next();
     },
   });
 }
-
-// For backwards compatibility, also export as createSchema
-export { createYjsSchema as createSchema };

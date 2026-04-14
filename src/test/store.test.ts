@@ -14,7 +14,7 @@ import {
   StoreUpdateContext,
   createSchema,
   createStore,
-  manage,
+  registerResource,
   slice,
   updateStore,
 } from "../store/index.js";
@@ -190,7 +190,7 @@ test("resets store", async () => {
   });
 });
 
-describe(".manage", () => {
+describe(".registerResource", () => {
   function guessAge(): Operation<{ guess: number; cumulative: null | number }> {
     return resource(function* (provide) {
       let cumulative = 0 as null | number;
@@ -217,11 +217,11 @@ describe(".manage", () => {
     const thunk = createThunks();
     thunk.use(thunk.routes());
     const [scope] = createScope();
-    const TestContext = manage("test:context", guessAge());
+    const TestContext = registerResource("test:context", guessAge());
     const store = createStore({
       scope,
       schemas: [createSchema()],
-      tasks: [TestContext.initialize(scope), thunk.register],
+      tasks: [TestContext.initialize, thunk.register],
     });
     let acc = "bla";
     const action = thunk.create("/users", function* (payload, next) {
@@ -243,11 +243,11 @@ describe(".manage", () => {
     const thunk = createThunks();
     thunk.use(thunk.routes());
     const [scope] = createScope();
-    const TestContext = manage("test:context", guessAge());
+    const TestContext = registerResource("test:context", guessAge());
     const store = createStore({
       scope,
       schemas: [createSchema()],
-      tasks: [TestContext.initialize(scope), thunk.register],
+      tasks: [TestContext.initialize, thunk.register],
     });
     let guess = 0;
     let acc = 0;

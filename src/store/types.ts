@@ -143,10 +143,6 @@ export interface FxStore<O extends FxMap> {
   schema: FxSchema<O>;
   // all schemas by name
   schemas: Record<string, FxSchema<O>>;
-  manage: <Resource>(
-    name: string,
-    resource: Operation<Resource>,
-  ) => Context<Resource>;
   run: ReturnType<typeof createRun>;
   // part of redux store API
   dispatch: (a: AnyAction | AnyAction[]) => unknown;

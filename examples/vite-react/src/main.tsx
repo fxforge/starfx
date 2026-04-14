@@ -5,11 +5,12 @@ import { Provider } from "starfx/react";
 import { api, schema } from "./api.ts";
 import App from "./App.tsx";
 import "./index.css";
+import { GlobalGuesser } from "./age-guess.ts";
 
 init();
 
 function init() {
-  const store = createStore({ schema, tasks: [logger, api.register] });
+  const store = createStore({ schema, tasks: [logger, api.register, GlobalGuesser.initialize] });
   // makes `fx` available in devtools
   (window as any).fx = store;
 

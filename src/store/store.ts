@@ -36,36 +36,6 @@ function observable() {
   };
 }
 
-/**
- * Creates a managed resource within the store's Effection scope.
- *
- * @remarks
- * The `manage` function allows you to define a resource that can be passed to
- * the `createStore({ tasks: [() => manage(...)] })` configuration. This resource will be automatically
- * initialized and cleaned up with the store's lifecycle. The provided resource is made available through a generated context that can be accessed by any operation within the store's scope.
- *
- * @param name - A unique name for the resource, used to create a context.
- * @param inputResource - An Effection operation that initializes the resource.
- * @returns A context object with an `initialize` method for setting up the resource.
- */
-export function manage<Resource>(
-  name: string,
-  inputResource: Operation<Resource>,
-) {
-  const CustomContext = createContext<Resource>(name);
-  function initialize(parentScope: Scope) {
-    return supervise(function* () {
-      const providedResource = yield* inputResource;
-      parentScope.set(CustomContext, providedResource);
-      yield* suspend();
-    });
-  }
-
-  // returns to the user so they can use this resource from
-  //  anywhere this context is available
-  return { ...CustomContext, initialize };
-}
-
 export interface CreateStore<O extends FxMap> {
   scope?: Scope;
   schema?: FxSchema<O>;
@@ -209,7 +179,6 @@ export function createStore<O extends FxMap>({
     getState,
     setState,
     subscribe,
-    manage,
     schema: baseSchema,
     schemas: schemasMap,
     run,

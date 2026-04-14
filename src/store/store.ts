@@ -70,6 +70,15 @@ export interface CreateStore<O extends FxMap> {
   scope?: Scope;
   schema?: FxSchema<O>;
   schemas?: FxSchema<O>[];
+  /**
+   * Long-lived startup operations to run inside the store scope.
+   *
+   * These tasks are lifecycle-managed by the store, but `createStore()` does
+   * not guarantee that arbitrary custom tasks have reached a caller-defined
+   * ready state before the first dispatch. If a custom task needs stronger
+   * startup coordination, it should expose and manage that readiness explicitly
+   * using existing primitives.
+   */
   tasks?: (() => Operation<void>)[];
 }
 
@@ -95,6 +104,9 @@ export const ListenersContext = createContext<Set<Listener>>(
  * @param options - Store configuration object.
  * @param options.scope - Optional Effection scope to use.
  * @param options.schemas - Schema list used to compose initial state.
+ * @param options.tasks - Long-lived startup operations to run in the
+ * store scope. Arbitrary custom tasks are started with the store, but they are
+ * not awaited to a caller-defined ready state.
  * @returns A fully configured store instance.
  *
  * @example

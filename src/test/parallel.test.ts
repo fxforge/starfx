@@ -87,12 +87,49 @@ test("should return all the result in an array, preserving order", async () => {
 });
 
 test("should return empty array", async () => {
-  let actual;
+  let actual: Result<unknown>[] = [];
   await run(function* (): Operation<void> {
     const results = yield* parallel([]);
     actual = yield* results;
   });
   expect(actual).toEqual([]);
+});
+
+test("should resolve started after all operations are spawned", async () => {
+  const result = await run(function* () {
+    let completed = 0;
+    const group = yield* parallel([
+      function* () {
+        yield* sleep(20);
+        completed += 1;
+        return "first";
+      },
+      function* () {
+        yield* sleep(20);
+        completed += 1;
+        return "second";
+      },
+    ]);
+
+    yield* group.started;
+    const startedBeforeCompletion = completed === 0;
+
+    yield* group;
+
+    return startedBeforeCompletion;
+  });
+
+  expect(result).toBe(true);
+});
+
+test("should resolve started for an empty operation list", async () => {
+  const result = await run(function* () {
+    const group = yield* parallel([]);
+    yield* group.started;
+    return "ready";
+  });
+
+  expect(result).toBe("ready");
 });
 
 test("should resolve all async items", async () => {

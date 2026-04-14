@@ -231,9 +231,7 @@ describe(".manage", () => {
     });
 
     await store.run(function* (): Operation<void> {
-      yield* sleep(0);
       store.dispatch(action());
-      yield* sleep(0);
     });
 
     expect(acc).toBe("blab");
@@ -261,9 +259,7 @@ describe(".manage", () => {
     });
 
     await store.run(function* (): Operation<void> {
-      yield* sleep(0);
       store.dispatch(action());
-      yield* sleep(0);
     });
 
     expect(guess).toBeGreaterThan(0);

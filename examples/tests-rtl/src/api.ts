@@ -21,14 +21,15 @@ export const fetchUsers = api.get("/users", function* (ctx, next) {
     return;
   }
 
-  const users = (ctx.json.value as User[]).reduce<Record<string, User>>((acc, user) => {
-    acc[user.id] = user;
-    return acc;
-  }, {});
+  const users = (ctx.json.value as User[]).reduce<Record<string, User>>(
+    (acc, user) => {
+      acc[user.id] = user;
+      return acc;
+    },
+    {},
+  );
 
   yield* schema.update(schema.users.add(users));
 });
-
-
 const { useSelector } = createTypedHooks(schema);
 export { useSelector };

@@ -1,23 +1,21 @@
 {
   "name": "tests-rtl",
   "scripts": {
-    "test": "jest"
+    "test": "vitest run"
   },
   "dependencies": {
     "starfx": "file:../.."
   },
   "devDependencies": {
-    "@babel/core": "^7.28.0",
-    "@babel/preset-env": "^7.28.0",
-    "@babel/preset-react": "^7.27.1",
-    "@babel/preset-typescript": "^7.27.1",
     "@testing-library/dom": "^10.4.0",
     "@testing-library/jest-dom": "^6.6.3",
     "@testing-library/react": "^16.3.0",
     "@testing-library/user-event": "^14.6.1",
-    "babel-jest": "^30.0.4",
-    "jest": "^30.0.4",
-    "jest-environment-jsdom": "^30.0.4",
+    "jsdom": "^26.1.0",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "react-redux": "^9.1.2",
+    "vitest": "^4.0.7",
     "whatwg-fetch": "^3.6.20"
   }
 }

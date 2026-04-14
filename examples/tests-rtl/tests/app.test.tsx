@@ -1,5 +1,4 @@
-import "@testing-library/jest-dom";
-import { expect, test } from "@jest/globals";
+import { expect, test } from "vitest";
 import { fireEvent, render, screen, waitFor } from "./utils";
 import { fetchUsers } from "../src/api";
 import { App } from "../src/app";

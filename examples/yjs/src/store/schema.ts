@@ -49,3 +49,5 @@ export function createYjsSchema<
     },
   });
 }
+
+export { createYjsSchema as createSchema };

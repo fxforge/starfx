@@ -5,6 +5,7 @@ import "./App.css";
 import { createFolder, useSelector } from "./thunks.js";
 
 function App({ id }: { id: string }) {
+  void id;
   const dispatch = useDispatch();
   const state = useSelector((s) => s);
   console.log("state", state);

@@ -10,7 +10,6 @@
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,
     "strict": true,
-    "forceConsistentCasingInFileNames": true,
     "target": "esnext",
     "module": "esnext",
     "moduleResolution": "bundler",
@@ -24,5 +23,5 @@
       "starfx/react": ["../../src/react.ts"]
     }
   },
-  "include": ["./src", "./tests"]
+  "include": ["./src"]
 }

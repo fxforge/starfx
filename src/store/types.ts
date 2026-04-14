@@ -1,4 +1,4 @@
-import type { Context, Operation, Scope } from "effection";
+import type { Operation, Scope } from "effection";
 import type { Draft, Immutable, Patch } from "immer";
 import type { BaseCtx } from "../index.js";
 import type { AnyAction, AnyState } from "../types.js";

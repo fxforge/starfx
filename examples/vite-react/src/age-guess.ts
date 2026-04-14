@@ -1,5 +1,5 @@
 import { type Operation, resource } from "effection";
-import { manage } from "starfx";
+import { registerResource } from "starfx";
 
 export function guessAge(): Operation<{ guess: number; accumulated: number }> {
   console.log("started");
@@ -27,4 +27,4 @@ export function guessAge(): Operation<{ guess: number; accumulated: number }> {
   });
 }
 
-export const GlobalGuesser = manage("global-guesser", guessAge());
+export const GlobalGuesser = registerResource("global-guesser", guessAge());

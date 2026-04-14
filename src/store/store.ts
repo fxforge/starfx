@@ -4,12 +4,10 @@ import {
   createContext,
   createScope,
   createSignal,
-  suspend,
 } from "effection";
 import { produce } from "immer";
 import { ActionContext, emit } from "../action.js";
 import { parallel } from "../fx/parallel.js";
-import { supervise } from "../fx/supervisor.js";
 import type { AnyAction } from "../types.js";
 import { StoreContext } from "./context.js";
 import { createRun } from "./run.js";

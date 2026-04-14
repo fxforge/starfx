@@ -2,9 +2,10 @@ import { type Operation, lift } from "effection";
 import { type Draft, enablePatches, produceWithPatches } from "immer";
 import { API_ACTION_PREFIX, ActionContext, emit } from "../action.js";
 import { type BaseMiddleware, compose } from "../compose.js";
-import { type AnyState, ListenersContext, type Next } from "../index.js";
+import type { AnyState, Next } from "../types.js";
 import { StoreUpdateContext, expectStore } from "./context.js";
 import { slice } from "./slice/index.js";
+import { ListenersContext } from "./store.js";
 import type {
   FactoryInitial,
   FactoryReturn,

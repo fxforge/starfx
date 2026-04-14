@@ -17,9 +17,11 @@ jobs:
       fail-fast: false
       matrix:
         example:
+          - ./examples/basic
           - ./examples/vite-react
           - ./examples/parcel-react
           - ./examples/tests-rtl
+          - ./examples/yjs
 
     steps:
       - name: checkout

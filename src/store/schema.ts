@@ -1,5 +1,5 @@
 import { type Operation, lift } from "effection";
-import { type Draft, enablePatches, produceWithPatches } from "immer";
+import { type Draft, enablePatches } from "immer";
 import { API_ACTION_PREFIX, ActionContext, emit } from "../action.js";
 import { type BaseMiddleware, compose } from "../compose.js";
 import type { AnyState, Next } from "../types.js";
@@ -249,15 +249,8 @@ export function createSchema<const O extends FxMap = FxMap>(
         Array.isArray(ctx.updater) ? ctx.updater : [ctx.updater]
       ) as StoreUpdater<SliceFromSchema<O>>[];
 
-      const [nextState, patches, _] = produceWithPatches<SliceFromSchema<O>>(
-        store.getState(),
-        (draft: Draft<SliceFromSchema<O>>) => {
-          upds.forEach((updater) => updater(draft));
-        },
-      );
+      const [_nextState, patches, _inversePatches] = store.setState(upds);
       ctx.patches = patches;
-
-      store.setState(nextState);
 
       yield* next();
     },

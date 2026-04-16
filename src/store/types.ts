@@ -1,5 +1,5 @@
 import type { Operation, Scope } from "effection";
-import type { Draft, Immutable, Patch } from "immer";
+import type { Draft, Immutable, Patch, produceWithPatches } from "immer";
 import type { BaseCtx } from "../compose.js";
 import type { AnyAction, AnyState } from "../types.js";
 import type { createRun } from "./run.js";
@@ -136,7 +136,9 @@ export interface FxStore<O extends FxMap> {
   getScope: () => Scope;
   // part of redux store API
   getState: () => SliceFromSchema<O>;
-  setState: (s: SliceFromSchema<O>) => void;
+  setState: (
+    upds: StoreUpdater<SliceFromSchema<O>>[],
+  ) => ReturnType<typeof produceWithPatches>;
   // part of redux store API
   subscribe: (fn: Listener) => () => void;
   // the default schema for this store

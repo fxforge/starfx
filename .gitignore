@@ -9,3 +9,4 @@ docs/public/*
 !docs/public/.gitkeep
 dist/
 src/package.json
+.playwright*

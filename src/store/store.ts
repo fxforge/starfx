@@ -5,7 +5,7 @@ import {
   createScope,
   createSignal,
 } from "effection";
-import { produce } from "immer";
+import { type Draft, produceWithPatches } from "immer";
 import { ActionContext, emit } from "../action.js";
 import { parallel } from "../fx/parallel.js";
 import type { AnyAction } from "../types.js";
@@ -17,6 +17,7 @@ import type {
   FxStore,
   Listener,
   SliceFromSchema,
+  StoreUpdater,
 } from "./types.js";
 const stubMsg = "This is merely a stub, not implemented";
 
@@ -148,13 +149,16 @@ export function createStore<O extends FxMap>({
     return state;
   }
 
-  function setState(newState: SliceFromSchema<O>) {
-    // enables merging multiple states from
-    // different schemas without overwriting the whole state
-    // TODO but this means double produce on the default single schema case
-    state = produce(state, (draft) => {
-      Object.assign(draft, newState);
-    });
+  function setState(upds: StoreUpdater<SliceFromSchema<O>>[]) {
+    const nextState = produceWithPatches(
+      state,
+      (draft: Draft<SliceFromSchema<O>>) => {
+        upds.forEach((updater) => updater(draft));
+      },
+    );
+
+    state = nextState[0];
+    return nextState;
   }
 
   function getInitialState() {

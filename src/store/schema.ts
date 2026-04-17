@@ -1,5 +1,5 @@
 import { type Operation, lift } from "effection";
-import { type Draft, enablePatches } from "immer";
+import type { Draft } from "immer";
 import { API_ACTION_PREFIX, ActionContext, emit } from "../action.js";
 import { type BaseMiddleware, compose } from "../compose.js";
 import type { AnyState, Next } from "../types.js";
@@ -226,8 +226,6 @@ export function createSchema<const O extends FxMap = FxMap>(
   slices?: O,
   options: CreateSchemaOptions<O> = {},
 ): FxSchema<O> {
-  enablePatches();
-
   const middleware = options.middleware as
     | BaseMiddleware<
         UpdaterCtx<SliceFromSchema<O>, SchemaUpdater<O> | SchemaUpdater<O>[]>

@@ -5,7 +5,7 @@ import {
   createScope,
   createSignal,
 } from "effection";
-import { type Draft, produceWithPatches } from "immer";
+import { type Draft, enablePatches, produceWithPatches } from "immer";
 import { ActionContext, emit } from "../action.js";
 import { parallel } from "../fx/parallel.js";
 import type { AnyAction } from "../types.js";
@@ -132,6 +132,7 @@ export function createStore<O extends FxMap>({
     {} as Record<string, FxSchema<O>>,
   );
 
+  enablePatches();
   // Build initial state from all schemas
   const initialState = schemas.reduce(
     (acc, schema) => {

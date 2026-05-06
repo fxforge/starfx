@@ -19,8 +19,8 @@ import type {
   FxStore,
   Listener,
   MergeSchemaRegistryMaps,
-  StoreSchemaRegistry,
   SliceFromSchema,
+  StoreSchemaRegistry,
   StoreUpdater,
 } from "./types.js";
 const stubMsg = "This is merely a stub, not implemented";

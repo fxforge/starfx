@@ -1,5 +1,5 @@
-import { call } from "../index.js";
 import { expectTypeOf } from "vitest";
+import { call } from "../index.js";
 import { createSchema, createStore, select, slice } from "../store/index.js";
 import { expect, test } from "../test.js";
 

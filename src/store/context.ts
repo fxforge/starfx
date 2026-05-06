@@ -1,5 +1,5 @@
 import { type Channel, createChannel, createContext } from "effection";
-import type { FxMap, FxStore } from "./types.js";
+import type { FxMap, FxSchema, FxStore, StoreSchemaRegistry } from "./types.js";
 
 /**
  * Channel used to notify that the store update sequence completed.
@@ -17,7 +17,10 @@ export const StoreUpdateContext = createContext<Channel<void, void>>(
  *
  * Use `expectStore()` within operations to access the store instance.
  */
-export const StoreContext = createContext<FxStore<FxMap>>("starfx:store");
+export const StoreContext =
+  createContext<FxStore<FxMap, StoreSchemaRegistry<FxSchema<FxMap>>>>(
+    "starfx:store",
+  );
 
 export function* expectStore<O extends FxMap = FxMap>() {
   return (yield* StoreContext.expect()) as FxStore<O>;

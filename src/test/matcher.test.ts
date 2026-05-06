@@ -17,7 +17,7 @@ test("true", () => {
 test("createAction should not match all actions", async () => {
   expect.assertions(1);
 
-  const store = createStore({ schemas: [createSchema()] });
+  const store = createStore({ schema: createSchema() });
   const matchedActions: string[] = [];
 
   const testAction = createAction("test/action");
@@ -52,7 +52,7 @@ test("matcher should correctly identify createAction functions", () => {
 test("typed createAction should work with takeLatest without type casting", async () => {
   expect.assertions(1);
 
-  const store = createStore({ schemas: [createSchema()] });
+  const store = createStore({ schema: createSchema() });
   const matchedActions: string[] = [];
 
   //typed action creator - this should work without 'as any'
@@ -88,7 +88,7 @@ test("should correctly identify starfx thunk as a thunk", async () => {
   thunks.use(thunks.routes());
 
   const store = createStore({
-    schemas: [createSchema()],
+    schema: createSchema(),
   });
   store.run(thunks.register);
 
@@ -118,7 +118,7 @@ test("matcher should correctly identify thunk functions", async () => {
   thunks.use(thunks.routes());
 
   const store = createStore({
-    schemas: [createSchema()],
+    schema: createSchema(),
   });
   store.run(thunks.register);
 
@@ -141,7 +141,7 @@ test("matcher should correctly identify thunk functions", async () => {
 test("some bug: createAction incorrectly matching all actions", async () => {
   expect.assertions(1);
 
-  const store = createStore({ schemas: [createSchema()] });
+  const store = createStore({ schema: createSchema() });
   const matchedActions: string[] = [];
 
   const testAction = createAction<{ MenuOpened: any }>("ACTION");

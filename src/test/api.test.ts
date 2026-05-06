@@ -166,7 +166,7 @@ test("POST with uri", () => {
     },
   );
 
-  const store = createStore({ schemas: [createSchema()] });
+  const store = createStore({ schema: createSchema() });
   store.run(query.register);
   store.dispatch(createUser({ email: mockUser.email }));
 });
@@ -187,7 +187,7 @@ test("middleware - with request fn", () => {
     { supervisor: takeEvery },
     query.request({ method: "POST" }),
   );
-  const store = createStore({ schemas: [createSchema()] });
+  const store = createStore({ schema: createSchema() });
   store.run(query.register);
   store.dispatch(createUser());
 });
@@ -216,7 +216,7 @@ test("run() on endpoint action - should run the effect", () => {
     },
   );
 
-  const store = createStore({ schemas: [createSchema()] });
+  const store = createStore({ schema: createSchema() });
   store.run(api.register);
   store.dispatch(action2());
 });
@@ -260,7 +260,7 @@ test("run() from a normal saga", async () => {
     yield* takeEvery(action2, onAction);
   }
 
-  const store = createStore({ schemas: [createSchema()] });
+  const store = createStore({ schema: createSchema() });
   store.run(() => keepAlive([api.register, watchAction]));
   store.dispatch(action2());
 
@@ -402,7 +402,7 @@ test("ensure types for get() endpoint", () => {
     },
   );
 
-  const store = createStore({ schemas: [createSchema()] });
+  const store = createStore({ schema: createSchema() });
   store.run(api.register);
 
   store.dispatch(action1({ id: "1" }));
@@ -440,7 +440,7 @@ test("ensure ability to cast `ctx` in function definition", () => {
     },
   );
 
-  const store = createStore({ schemas: [createSchema()] });
+  const store = createStore({ schema: createSchema() });
   store.run(api.register);
   store.dispatch(action1({ id: "1" }));
   expect(acc).toEqual(["1", "wow"]);
@@ -474,7 +474,7 @@ test("ensure ability to cast `ctx` in function definition with no props", () => 
     },
   );
 
-  const store = createStore({ schemas: [createSchema()] });
+  const store = createStore({ schema: createSchema() });
   store.run(api.register);
   store.dispatch(action1());
   expect(acc).toEqual(["wow"]);
@@ -542,7 +542,7 @@ test("useCache - derive api success from endpoint", () => {
     },
   );
 
-  const store = createStore({ schemas: [createSchema()] });
+  const store = createStore({ schema: createSchema() });
   store.run(api.register);
 
   function _App() {

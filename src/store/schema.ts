@@ -51,11 +51,6 @@ export interface CreateSchemaWithUpdaterOptions<
   S extends AnyState,
   U = StoreUpdater<S> | StoreUpdater<S>[],
 > {
-  /**
-   * Unique name for this schema. Used to access the schema from the store.
-   * @default "default"
-   */
-  name?: string;
   middleware?: BaseMiddleware<UpdaterCtx<S, U>>[];
   /**
    * Factory function that creates the update middleware.
@@ -66,11 +61,6 @@ export interface CreateSchemaWithUpdaterOptions<
 }
 
 interface CreateSchemaOptions<O extends FxMap> {
-  /**
-   * Unique name for this schema. Used to access the schema from the store.
-   * @default "default"
-   */
-  name?: string;
   /**
    * Escape hatch for middleware values that are not typed to this schema.
    *
@@ -114,6 +104,8 @@ function* notifyListenersMdw<S extends AnyState, U>(
   yield* next();
 }
 
+export const baseMiddlewares = [logMdw, notifyChannelMdw, notifyListenersMdw];
+
 /**
  * Core schema factory that takes a custom update middleware creator.
  * Use this to create schema implementations with different state update mechanisms.
@@ -138,7 +130,6 @@ function* notifyListenersMdw<S extends AnyState, U>(
 export function createSchemaWithUpdater<O extends FxMap>(
   slices: O,
   {
-    name = "default",
     middleware = [],
     initialize,
     updateMdw,
@@ -156,7 +147,7 @@ export function createSchemaWithUpdater<O extends FxMap>(
     >
   > = compose<
     UpdaterCtx<SliceFromSchema<O>, SchemaUpdater<O> | SchemaUpdater<O>[]>
-  >([updateMdw, ...middleware, logMdw, notifyChannelMdw, notifyListenersMdw]);
+  >([updateMdw, ...middleware, ...baseMiddlewares]);
 
   function* update(ups: SchemaUpdater<O> | SchemaUpdater<O>[]) {
     const ctx: UpdaterCtx<
@@ -201,7 +192,6 @@ export function createSchemaWithUpdater<O extends FxMap>(
   }
 
   const schema = db as FxSchema<O>;
-  schema.name = name;
   schema.update = update;
   schema.initialize = initialize;
   schema.initialState = initialState as SliceFromSchema<O>;
@@ -233,7 +223,6 @@ export function createSchema<const O extends FxMap = FxMap>(
     | undefined;
 
   return createSchemaWithUpdater(slices ?? defaultSchema<O>(), {
-    name: options.name,
     middleware,
     *updateMdw(
       ctx: UpdaterCtx<

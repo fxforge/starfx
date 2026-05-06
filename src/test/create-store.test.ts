@@ -1,4 +1,5 @@
 import { call } from "../index.js";
+import { expectTypeOf } from "vitest";
 import { createSchema, createStore, select, slice } from "../store/index.js";
 import { expect, test } from "../test.js";
 
@@ -6,10 +7,18 @@ interface TestState {
   user: { id: string };
 }
 
+interface BaseState {
+  users: Record<string | number, { id: string; name: string }>;
+}
+
+interface MetadataState {
+  metadata: Record<string, string>;
+}
+
 test("should be able to grab values from store", async () => {
   let actual: TestState["user"] | undefined;
   const store = createStore({
-    schemas: [createSchema({ user: slice.obj({ id: "1" }) })],
+    schema: createSchema({ user: slice.obj({ id: "1" }) }),
   });
   await store.run(function* () {
     actual = yield* select((s: TestState) => s.user);
@@ -20,7 +29,7 @@ test("should be able to grab values from store", async () => {
 test("should be able to grab store from a nested call", async () => {
   let actual: TestState["user"] | undefined;
   const store = createStore({
-    schemas: [createSchema({ user: slice.obj({ id: "2" }) })],
+    schema: createSchema({ user: slice.obj({ id: "2" }) }),
   });
   await store.run(function* () {
     actual = yield* call(function* () {
@@ -43,19 +52,78 @@ test("should accept a single schema option", async () => {
   expect(store.schema).toBe(schema);
 });
 
-test("should reject both schema and schemas", () => {
-  const schema = createSchema({ user: slice.obj({ id: "4" }) });
+test("should reject schema registries without default", () => {
+  const metadata = createSchema({
+    metadata: slice.obj<Record<string, string>>({}),
+  });
 
   expect(() =>
-    createStore({
-      schema,
-      schemas: [schema],
-    }),
-  ).toThrow("Provide either `schema` or `schemas`, not both.");
+    createStore(
+      // biome-ignore lint/suspicious/noExplicitAny: runtime validation test intentionally passes an invalid config shape.
+      { schema: { metadata } } as any,
+    ),
+  ).toThrow("A schema registry must include `default`.");
 });
 
 test("should reject missing schema configuration", () => {
-  expect(() => createStore({})).toThrow(
-    "At least one schema must be provided.",
-  );
+  expect(() =>
+    // biome-ignore lint/suspicious/noExplicitAny: runtime validation test intentionally passes an invalid config shape.
+    createStore({} as any),
+  ).toThrow("At least one schema must be provided.");
+});
+
+test("should keep base schema typing while merging store state across schemas", () => {
+  const baseSchema = createSchema({
+    users: slice.table<{ id: string; name: string }>(),
+  });
+  const metadataSchema = createSchema({
+    metadata: slice.obj<Record<string, string>>({}),
+  });
+  const store = createStore({
+    schema: { default: baseSchema, metadata: metadataSchema },
+  });
+
+  const readBaseUsers = () => store.schema.users.selectTableAsList;
+  expectTypeOf(readBaseUsers).toBeFunction();
+
+  // @ts-expect-error base schema should not expose slices from later schemas
+  const readMetadataFromBaseSchema = () => store.schema.metadata.select;
+  void readMetadataFromBaseSchema;
+
+  const state = store.getState();
+  expectTypeOf(state.users).toEqualTypeOf<BaseState["users"]>();
+  expectTypeOf(state.metadata).toEqualTypeOf<MetadataState["metadata"]>();
+});
+
+test("should require default in schema registries", () => {
+  const metadataSchema = createSchema({
+    metadata: slice.obj<Record<string, string>>({}),
+  });
+  const schema = { metadata: metadataSchema };
+
+  // @ts-expect-error schema registries must include a default schema
+  const createStoreWithoutDefault = () => createStore({ schema });
+  void createStoreWithoutDefault;
+});
+
+test("should keep multi-schema typing for schema registry variables", () => {
+  const baseSchema = createSchema({
+    users: slice.table<{ id: string; name: string }>(),
+  });
+  const metadataSchema = createSchema({
+    metadata: slice.obj<Record<string, string>>({}),
+  });
+  const schema = { default: baseSchema, metadata: metadataSchema };
+  const store = createStore({ schema });
+
+  const readBaseUsers = () => store.schema.users.selectTableAsList;
+  expectTypeOf(readBaseUsers).toBeFunction();
+
+  // @ts-expect-error base schema should not expose slices from later schemas
+  const readMetadataFromBaseSchema = () => store.schema.metadata.select;
+  void readMetadataFromBaseSchema;
+
+  const state = store.getState();
+  expectTypeOf(state.users).toEqualTypeOf<BaseState["users"]>();
+  expectTypeOf(state.metadata).toEqualTypeOf<MetadataState["metadata"]>();
 });

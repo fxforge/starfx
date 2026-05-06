@@ -50,7 +50,7 @@ test("general types and functionality", async () => {
     cache: slice.table({ empty: {} }),
     loaders: slice.loaders(),
   });
-  const store = createStore({ schemas: [db] });
+  const store = createStore({ schema: db });
 
   expect(store.getState()).toEqual({
     users: { "1": { id: "1", name: "wow" } },
@@ -105,7 +105,7 @@ test("can work with a nested object", async () => {
     cache: slice.table({ empty: {} }),
     loaders: slice.loaders(),
   });
-  const store = createStore({ schemas: [db] });
+  const store = createStore({ schema: db });
   type State = ReturnType<typeof store.getState>;
   await store.run(function* () {
     yield* db.update(db.currentUser.update({ key: "name", value: "vvv" }));

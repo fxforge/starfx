@@ -19,7 +19,7 @@ import type {
 
 /**
  * Updates the store using the default schema's update method.
- * For multiple schemas, use `store.schemas[name].update()` directly.
+ * For additional schemas, use `store.schemas[key].update()` directly.
  */
 export function* updateStore<S extends AnyState>(
   updater: StoreUpdater<S> | StoreUpdater<S>[],

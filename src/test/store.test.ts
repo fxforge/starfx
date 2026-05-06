@@ -220,7 +220,7 @@ describe(".registerResource", () => {
     const TestContext = registerResource("test:context", guessAge());
     const store = createStore({
       scope,
-      schemas: [createSchema()],
+      schema: createSchema(),
       tasks: [TestContext.initialize, thunk.register],
     });
     let acc = "bla";
@@ -246,7 +246,7 @@ describe(".registerResource", () => {
     const TestContext = registerResource("test:context", guessAge());
     const store = createStore({
       scope,
-      schemas: [createSchema()],
+      schema: createSchema(),
       tasks: [TestContext.initialize, thunk.register],
     });
     let guess = 0;

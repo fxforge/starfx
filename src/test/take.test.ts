@@ -22,7 +22,7 @@ test("a put should complete before more `take` are added and then consumed autom
     actual.push(yield* take("action-1"));
   }
 
-  const store = createStore({ schemas: [createSchema()] });
+  const store = createStore({ schema: createSchema() });
   await store.run(root);
 
   expect(actual).toEqual([
@@ -94,7 +94,7 @@ test("take from default channel", async () => {
     yield* takes; // wait for the takes to complete
   }
 
-  const store = createStore({ schemas: [createSchema()] });
+  const store = createStore({ schema: createSchema() });
   await store.run(genFn);
 
   const expected = [

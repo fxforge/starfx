@@ -1,7 +1,13 @@
 import {
+  baseMiddlewares,
+  compose,
   type FxMap,
   type FxSchema,
+  type FxStore,
+  type Next,
+  type SchemaUpdater,
   type StoreUpdater,
+  type UpdaterCtx,
   createSchemaWithUpdater,
   expectStore,
   type SliceFromSchema,
@@ -11,38 +17,58 @@ import {
 import type { Draft } from "immer";
 import * as Y from "yjs";
 
-const SNAPSHOT = Symbol("yjs:snapshot");
-
-type SnapshotUpdater<S extends Record<string, unknown>> = StoreUpdater<S> & {
-  [SNAPSHOT]: true;
-};
-
 function createSnapshotUpdater<O extends FxMap>(
   snapshot: SliceFromSchema<O>,
-): SnapshotUpdater<SliceFromSchema<O>> {
-  return Object.assign(
-    (draft: Draft<SliceFromSchema<O>>) => {
-      const nextState = snapshot as Record<string, unknown>;
-      const draftState = draft as Record<string, unknown>;
+): StoreUpdater<SliceFromSchema<O>> {
+  return (draft: Draft<SliceFromSchema<O>>) => {
+    const nextState = snapshot as Record<string, unknown>;
+    const draftState = draft as Record<string, unknown>;
 
-      for (const key of Object.keys(draftState)) {
-        if (!(key in nextState)) {
-          delete draftState[key];
-        }
+    for (const key of Object.keys(draftState)) {
+      if (!(key in nextState)) {
+        delete draftState[key];
       }
+    }
 
-      Object.assign(draftState, nextState);
-    },
-    { [SNAPSHOT]: true as const },
-  );
+    Object.assign(draftState, nextState);
+  };
 }
 
-function isSnapshotUpdater<O extends FxMap>(
-  updater: unknown,
-): updater is SnapshotUpdater<SliceFromSchema<O>> {
-  return (
-    typeof updater === "function" && Reflect.get(updater, SNAPSHOT) === true
-  );
+function* reconcileSnapshot<O extends FxMap>(
+  store: FxStore<O>,
+  snapshot: SliceFromSchema<O>,
+) {
+  const updater = createSnapshotUpdater(snapshot);
+  const ctx: UpdaterCtx<
+    SliceFromSchema<O>,
+    SchemaUpdater<O> | SchemaUpdater<O>[]
+  > = {
+    updater,
+    patches: [],
+  };
+
+  const applySnapshot = function*(
+    innerCtx: UpdaterCtx<
+      SliceFromSchema<O>,
+      SchemaUpdater<O> | SchemaUpdater<O>[]
+    >,
+    next: Next,
+  ) {
+    const [_nextState, patches] = store.setState([
+      updater as StoreUpdater<SliceFromSchema<O>>,
+    ]);
+    innerCtx.patches = patches;
+    yield* next();
+  };
+
+  const runSnapshotMdw = compose<
+    UpdaterCtx<SliceFromSchema<O>, SchemaUpdater<O> | SchemaUpdater<O>[]>
+  >([
+    applySnapshot,
+    ...baseMiddlewares,
+  ]);
+
+  yield* runSnapshotMdw(ctx);
 }
 
 /**
@@ -59,17 +85,20 @@ export function createYjsSchema<O extends FxMap>(slices: O): FxSchema<O> {
   data.set("items", new Y.Array());
 
   return createSchemaWithUpdater(slices, {
-    name: "yjs",
-    initialize: function* () {
+    *initialize() {
       const store = yield* expectStore<O>();
-      const schema = store.schemas["yjs"];
-      let observation = createSignal<{
-        events: Y.YEvent<unknown>[];
-        transaction: any// Y.Transaction is just unknown?
+      const observation = createSignal<{
+        events: Y.YEvent<Y.AbstractType<unknown>>[];
+        transaction: Y.Transaction;
       }>();
 
       root.observeDeep(
-        (events: Y.YEvent<unknown>[], transaction: Y.Transaction) => {
+        (
+          events: Y.YEvent<Y.AbstractType<unknown>>[],
+          transaction: Y.Transaction,
+        ) => {
+          // Only forward remote Yjs transactions; local ones already flow
+          // through updateMdw and do not need a second reconciliation pass.
           if (typeof transaction === "object" && transaction !== null && "local" in transaction && !transaction.local) {
             console.log("Y.Doc changed, sending update", events, transaction);
             observation.send({ events, transaction });
@@ -77,9 +106,7 @@ export function createYjsSchema<O extends FxMap>(slices: O): FxSchema<O> {
         },
       );
 
-      yield* schema.update(
-        createSnapshotUpdater(root.toJSON() as SliceFromSchema<O>),
-      );
+      yield* reconcileSnapshot(store, root.toJSON() as SliceFromSchema<O>);
 
       for (const { events, transaction } of yield* each(observation)) {
         console.log(
@@ -87,24 +114,12 @@ export function createYjsSchema<O extends FxMap>(slices: O): FxSchema<O> {
           events,
           transaction,
         );
-        yield* schema.update(
-          createSnapshotUpdater(root.toJSON() as SliceFromSchema<O>),
-        );
+        yield* reconcileSnapshot(store, root.toJSON() as SliceFromSchema<O>);
       }
     },
     *updateMdw(ctx, next) {
       const store = yield* expectStore<O>();
       const updaters = Array.isArray(ctx.updater) ? ctx.updater : [ctx.updater];
-
-      const snapshotUpdaters = updaters.filter((updater) =>
-        isSnapshotUpdater<O>(updater),
-      );
-
-      if (snapshotUpdaters.length > 0) {
-        store.setState(snapshotUpdaters);
-        yield* next();
-        return;
-      }
 
       ydoc.transact(() => {
         for (const updater of updaters) {

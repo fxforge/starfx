@@ -45,4 +45,3 @@ export const createFolder = thunks.create<any>("/users", function* (ctx, next) {
 });
 
 export const { useSelector } = createTypedHooks(schema);
-

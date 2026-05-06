@@ -72,6 +72,39 @@ export interface FxMap {
   [key: string]: ((name: string) => BaseSchema<unknown>) | undefined;
 }
 
+// biome-ignore lint/suspicious/noExplicitAny: used only to represent an arbitrary schema instance in store composition helpers.
+export type AnyFxSchema = FxSchema<any>;
+
+export const DEFAULT_SCHEMA_KEY = "default";
+
+export type DefaultSchemaKey = typeof DEFAULT_SCHEMA_KEY;
+
+export type SchemaRegistry = Record<string, AnyFxSchema>;
+
+export type StoreSchemaRegistry<TDefault extends AnyFxSchema = AnyFxSchema> =
+  Record<DefaultSchemaKey, TDefault> & SchemaRegistry;
+
+export type SchemaMapOf<TSchema> = TSchema extends FxSchema<infer O>
+  ? O
+  : never;
+
+type UnionToIntersection<T> = (
+  T extends unknown
+    ? (value: T) => void
+    : never
+) extends (value: infer I) => void
+  ? I
+  : never;
+
+type Simplify<T> = { [K in keyof T]: T[K] } & {};
+
+export type MergeSchemaRegistryMaps<TSchemas extends StoreSchemaRegistry> =
+  UnionToIntersection<
+    SchemaMapOf<TSchemas[keyof TSchemas]>
+  > extends infer O extends FxMap
+    ? Simplify<O>
+    : never;
+
 // Helper types to extract the factory return type and its initialState
 export type FactoryReturn<T> = T extends (name: string) => infer R ? R : never;
 export type FactoryInitial<T> = FactoryReturn<
@@ -111,7 +144,6 @@ export type SchemaUpdater<O extends FxMap> =
 export type FxSchema<O extends FxMap = FxMap> = {
   [K in keyof O]: FactoryReturn<NonNullable<O[K]>>;
 } & {
-  name: string;
   initialize?: () => Operation<void>;
   update: (
     u: SchemaUpdater<O> | SchemaUpdater<O>[],
@@ -132,7 +164,10 @@ export type FxSchema<O extends FxMap = FxMap> = {
  * @remarks
  * Compatible with react-redux store expectations for interop.
  */
-export interface FxStore<O extends FxMap> {
+export interface FxStore<
+  O extends FxMap,
+  TSchemas extends StoreSchemaRegistry = StoreSchemaRegistry<FxSchema<O>>,
+> {
   getScope: () => Scope;
   // part of redux store API
   getState: () => SliceFromSchema<O>;
@@ -142,9 +177,9 @@ export interface FxStore<O extends FxMap> {
   // part of redux store API
   subscribe: (fn: Listener) => () => void;
   // the default schema for this store
-  schema: FxSchema<O>;
-  // all schemas by name
-  schemas: Record<string, FxSchema<O>>;
+  schema: TSchemas[DefaultSchemaKey];
+  // all schemas keyed by their registry entry
+  schemas: TSchemas;
   run: ReturnType<typeof createRun>;
   // part of redux store API
   dispatch: (a: AnyAction | AnyAction[]) => unknown;

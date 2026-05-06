@@ -219,7 +219,7 @@ test("error handling", () => {
 
   const action = api.create("/error", { supervisor: takeEvery });
 
-  const store = createStore({ schemas: [createSchema()] });
+  const store = createStore({ schema: createSchema() });
   store.run(api.register);
   store.dispatch(action());
   expect(called).toBe(true);
@@ -245,7 +245,7 @@ test("error handling inside create", () => {
       }
     },
   );
-  const store = createStore({ schemas: [createSchema()] });
+  const store = createStore({ schema: createSchema() });
   store.run(api.register);
   store.dispatch(action());
   expect(called).toBe(true);
@@ -274,7 +274,7 @@ test("error inside endpoint mdw", () => {
   );
 
   const store = createStore({
-    schemas: [createSchema()],
+    schema: createSchema(),
   });
   store.run(query.register);
   store.dispatch(fetchUsers());
@@ -307,7 +307,7 @@ test("create fn is an array", () => {
     },
   ]);
 
-  const store = createStore({ schemas: [createSchema()] });
+  const store = createStore({ schema: createSchema() });
   store.run(api.register);
   store.dispatch(action());
 });
@@ -339,7 +339,7 @@ test("run() on endpoint action - should run the effect", () => {
     },
   );
 
-  const store = createStore({ schemas: [createSchema()] });
+  const store = createStore({ schema: createSchema() });
   store.run(api.register);
   store.dispatch(action2());
   expect(acc).toBe("ab");
@@ -380,7 +380,7 @@ test("run() on endpoint action with payload - should run the effect", () => {
     },
   );
 
-  const store = createStore({ schemas: [createSchema()] });
+  const store = createStore({ schema: createSchema() });
   store.run(api.register);
   store.dispatch(action2());
   expect(acc).toBe("ab");
@@ -427,7 +427,7 @@ test("middleware order of execution", async () => {
     },
   );
 
-  const store = createStore({ schemas: [createSchema()] });
+  const store = createStore({ schema: createSchema() });
   store.run(api.register);
   store.dispatch(action());
 
@@ -461,7 +461,7 @@ test("retry with actionFn", async () => {
     }
   });
 
-  const store = createStore({ schemas: [createSchema()] });
+  const store = createStore({ schema: createSchema() });
   store.run(api.register);
   store.dispatch(action());
 
@@ -496,7 +496,7 @@ test("retry with actionFn with payload", async () => {
     },
   );
 
-  const store = createStore({ schemas: [createSchema()] });
+  const store = createStore({ schema: createSchema() });
   store.run(api.register);
   store.dispatch(action({ page: 1 }));
 
@@ -531,7 +531,7 @@ test("should only call thunk once", () => {
     },
   );
 
-  const store = createStore({ schemas: [createSchema()] });
+  const store = createStore({ schema: createSchema() });
   store.run(api.register);
   store.dispatch(action2());
   expect(acc).toBe("a");
@@ -541,7 +541,7 @@ test("should be able to create thunk after `register()`", () => {
   expect.assertions(1);
   const api = createThunks<RoboCtx>();
   api.use(api.routes());
-  const store = createStore({ schemas: [createSchema()] });
+  const store = createStore({ schema: createSchema() });
   store.run(api.register);
 
   let acc = "";
@@ -561,7 +561,7 @@ test("should warn when calling thunk before registered", () => {
   };
   const api = createThunks<RoboCtx>();
   api.use(api.routes());
-  const store = createStore({ schemas: [createSchema()] });
+  const store = createStore({ schema: createSchema() });
 
   const action = api.create("/users");
   store.dispatch(action());
@@ -573,7 +573,7 @@ test("it should call the api once even if we register it twice", () => {
   expect.assertions(1);
   const api = createThunks<RoboCtx>();
   api.use(api.routes());
-  const store = createStore({ schemas: [createSchema()] });
+  const store = createStore({ schema: createSchema() });
   store.run(api.register);
   store.run(api.register);
 
@@ -593,7 +593,7 @@ test("should call the API only once, even if registered multiple times, with mul
   const api2 = createThunks<RoboCtx>();
   api2.use(api2.routes());
 
-  const store = createStore({ schemas: [createSchema()] });
+  const store = createStore({ schema: createSchema() });
 
   store.run(api1.register);
   store.run(api1.register);
@@ -624,7 +624,7 @@ test("should unregister the thunk when the registration function exits", async (
   const api1 = createThunks<RoboCtx>();
   api1.use(api1.routes());
 
-  const store = createStore({ schemas: [createSchema()] });
+  const store = createStore({ schema: createSchema() });
   const task = store.run(api1.register);
   await task.halt();
   store.run(api1.register);
@@ -642,8 +642,8 @@ test("should allow multiple stores to register a thunk", () => {
   expect.assertions(1);
   const api1 = createThunks<RoboCtx>();
   api1.use(api1.routes());
-  const storeA = createStore({ schemas: [createSchema()] });
-  const storeB = createStore({ schemas: [createSchema()] });
+  const storeA = createStore({ schema: createSchema() });
+  const storeB = createStore({ schema: createSchema() });
   storeA.run(api1.register);
   storeB.run(api1.register);
   let acc = "";
@@ -683,7 +683,7 @@ describe(".manage", () => {
     const thunk = createThunks<RoboCtx>();
     thunk.use(thunk.routes());
     const TestContext = thunk.manage("test:context", guessAge());
-    const store = createStore({ schemas: [createSchema()] });
+    const store = createStore({ schema: createSchema() });
     store.run(thunk.register);
     let acc = "";
     const action = thunk.create("/users", function* (payload, next) {
@@ -701,7 +701,7 @@ describe(".manage", () => {
     const thunk = createThunks<RoboCtx>();
     thunk.use(thunk.routes());
     const TestContext = thunk.manage("test:context", guessAge());
-    const store = createStore({ schemas: [createSchema()] });
+    const store = createStore({ schema: createSchema() });
     store.run(thunk.register);
     let acc = "";
     const action = thunk.create("/users", function* (payload, next) {
@@ -720,7 +720,7 @@ describe(".manage", () => {
     const thunk = createThunks<RoboCtx>();
     thunk.use(thunk.routes());
     const TestContext = thunk.manage("test:context", guessAge());
-    const store = createStore({ schemas: [createSchema()] });
+    const store = createStore({ schema: createSchema() });
     store.run(thunk.register);
     let guess = 0;
     let acc = 0;

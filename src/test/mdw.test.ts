@@ -517,7 +517,7 @@ test("errorHandler", () => {
   );
 
   const store = createStore({
-    schemas: [createSchema()],
+    schema: createSchema(),
   });
   store.run(query.register);
   store.dispatch(fetchUsers());

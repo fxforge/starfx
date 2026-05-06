@@ -26,7 +26,7 @@ test("should send actions through channel", async () => {
     yield* task;
   }
 
-  const store = createStore({ schemas: [createSchema()] });
+  const store = createStore({ schema: createSchema() });
   await store.run(() => genFn("arg"));
 
   const expected = ["arg", "2"];
@@ -59,7 +59,7 @@ test("should handle nested puts", async () => {
     yield* sleep(0);
   }
 
-  const store = createStore({ schemas: [createSchema()] });
+  const store = createStore({ schema: createSchema() });
   await store.run(() => root());
 
   // TODO, was this backwards? we are using `take("a")` in `genB`, so it will wait for `genA` to finish
@@ -74,7 +74,7 @@ test("should not cause stack overflow when puts are emitted while dispatching sa
     }
   }
 
-  const store = createStore({ schemas: [createSchema()] });
+  const store = createStore({ schema: createSchema() });
   await store.run(root);
   expect(true).toBe(true);
 });
@@ -101,7 +101,7 @@ test("should not miss `put` that was emitted directly after creating a task (cau
     yield* tsk;
   }
 
-  const store = createStore({ schemas: [createSchema()] });
+  const store = createStore({ schema: createSchema() });
   await store.run(root);
   const expected = ["didn't get missed"];
   expect(actual).toEqual(expected);

@@ -11,11 +11,15 @@ import { parallel } from "../fx/parallel.js";
 import type { AnyAction } from "../types.js";
 import { StoreContext } from "./context.js";
 import { createRun } from "./run.js";
+import { DEFAULT_SCHEMA_KEY } from "./types.js";
 import type {
+  AnyFxSchema,
   FxMap,
   FxSchema,
   FxStore,
   Listener,
+  MergeSchemaRegistryMaps,
+  StoreSchemaRegistry,
   SliceFromSchema,
   StoreUpdater,
 } from "./types.js";
@@ -37,8 +41,7 @@ function observable() {
 
 export interface CreateStore<O extends FxMap> {
   scope?: Scope;
-  schema?: FxSchema<O>;
-  schemas?: FxSchema<O>[];
+  schema: FxSchema<O>;
   /**
    * Long-lived startup operations to run inside the store scope.
    *
@@ -48,6 +51,12 @@ export interface CreateStore<O extends FxMap> {
    * startup coordination, it should expose and manage that readiness explicitly
    * using existing primitives.
    */
+  tasks?: (() => Operation<void>)[];
+}
+
+export interface CreateStoreMulti<TSchemas extends StoreSchemaRegistry> {
+  scope?: Scope;
+  schema: TSchemas;
   tasks?: (() => Operation<void>)[];
 }
 
@@ -72,7 +81,8 @@ export const ListenersContext = createContext<Set<Listener>>(
  * @typeParam O - Slice factory map used to build schema/state shape.
  * @param options - Store configuration object.
  * @param options.scope - Optional Effection scope to use.
- * @param options.schemas - Schema list used to compose initial state.
+ * @param options.schema - Single schema or a keyed schema registry whose
+ * `default` entry defines `store.schema`.
  * @param options.tasks - Long-lived startup operations to run in the
  * store scope. Arbitrary custom tasks are started with the store, but they are
  * not awaited to a caller-defined ready state.
@@ -86,33 +96,38 @@ export const ListenersContext = createContext<Set<Listener>>(
  *   loaders: slice.loaders(),
  * });
  *
- * const store = createStore({ schemas: [schema] });
+ * const store = createStore({ schema });
  * ```
  */
-export function createStore<O extends FxMap>({
+export function createStore<O extends FxMap>(
+  options: CreateStore<O>,
+): FxStore<O>;
+export function createStore<const TSchemas extends StoreSchemaRegistry>(
+  options: CreateStoreMulti<TSchemas>,
+): FxStore<MergeSchemaRegistryMaps<TSchemas>, TSchemas>;
+export function createStore({
   scope: initScope,
-  schema: singleSchema,
-  schemas: multiSchemas,
+  schema: schemaInput,
   tasks = [],
-}: CreateStore<O>): FxStore<O> {
-  // ensure only schema or schemas is provided, not both or neither
-  if (singleSchema && multiSchemas) {
-    throw new Error("Provide either `schema` or `schemas`, not both.");
-  }
-  if (!singleSchema && !multiSchemas) {
+}: CreateStore<FxMap> | CreateStoreMulti<StoreSchemaRegistry>): FxStore<
+  FxMap,
+  StoreSchemaRegistry<FxSchema<FxMap>>
+> {
+  if (!schemaInput) {
     throw new Error("At least one schema must be provided.");
   }
 
-  // normalize to array of schemas for easier processing
-  let schemas: FxSchema<O>[];
-  if (singleSchema) {
-    schemas = [singleSchema];
-  } else if (multiSchemas) {
-    schemas = multiSchemas;
-  } else {
-    throw new Error("Provide either `schema` or `schemas`.");
+  if (!isFxSchema(schemaInput) && !isSchemaRegistry(schemaInput)) {
+    throw new Error("A schema registry must include `default`");
   }
-  const baseSchema = schemas[0];
+
+  const schemasMap: StoreSchemaRegistry<FxSchema<FxMap>> = isSchemaRegistry(
+    schemaInput,
+  )
+    ? (schemaInput as StoreSchemaRegistry<FxSchema<FxMap>>)
+    : { [DEFAULT_SCHEMA_KEY]: schemaInput as FxSchema<FxMap> };
+  const schemas = Object.values(schemasMap);
+  const baseSchema = schemasMap[DEFAULT_SCHEMA_KEY];
 
   const [scope] = initScope ? [initScope] : createScope();
 
@@ -123,22 +138,13 @@ export function createStore<O extends FxMap>({
   scope.set(ActionContext, signal);
   scope.set(IdContext, id++);
 
-  // Build schemas map by name for selective access
-  const schemasMap = schemas.reduce(
-    (acc, s) => {
-      acc[s.name] = s;
-      return acc;
-    },
-    {} as Record<string, FxSchema<O>>,
-  );
-
   enablePatches();
   // Build initial state from all schemas
   const initialState = schemas.reduce(
     (acc, schema) => {
       return Object.assign(acc, schema.initialState);
     },
-    {} as SliceFromSchema<O>,
+    {} as SliceFromSchema<FxMap>,
   );
   let state = initialState;
 
@@ -150,10 +156,10 @@ export function createStore<O extends FxMap>({
     return state;
   }
 
-  function setState(upds: StoreUpdater<SliceFromSchema<O>>[]) {
+  function setState(upds: StoreUpdater<SliceFromSchema<FxMap>>[]) {
     const nextState = produceWithPatches(
       state,
-      (draft: Draft<SliceFromSchema<O>>) => {
+      (draft: Draft<SliceFromSchema<FxMap>>) => {
         upds.forEach((updater) => updater(draft));
       },
     );
@@ -177,7 +183,7 @@ export function createStore<O extends FxMap>({
 
   const run = createRun(scope);
 
-  const store: FxStore<O> = {
+  const store: FxStore<FxMap, StoreSchemaRegistry<FxSchema<FxMap>>> = {
     getScope,
     getState,
     setState,
@@ -190,7 +196,10 @@ export function createStore<O extends FxMap>({
     dispatch,
     // stubs so `react-redux` is happy
     replaceReducer(
-      _nextReducer: (s: SliceFromSchema<O>, a: AnyAction) => SliceFromSchema<O>,
+      _nextReducer: (
+        s: SliceFromSchema<FxMap>,
+        a: AnyAction,
+      ) => SliceFromSchema<FxMap>,
     ): void {
       throw new Error(stubMsg);
     },
@@ -212,4 +221,24 @@ export function createStore<O extends FxMap>({
   });
 
   return store;
+}
+
+function isSchemaRegistry(
+  schema: AnyFxSchema | StoreSchemaRegistry,
+): schema is StoreSchemaRegistry {
+  return (
+    typeof schema === "object" &&
+    schema !== null &&
+    DEFAULT_SCHEMA_KEY in schema &&
+    isFxSchema(schema[DEFAULT_SCHEMA_KEY])
+  );
+}
+
+function isFxSchema(value: unknown): value is AnyFxSchema {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "update" in value &&
+    "initialState" in value
+  );
 }

@@ -62,7 +62,7 @@ test("should reject schema registries without default", () => {
       // biome-ignore lint/suspicious/noExplicitAny: runtime validation test intentionally passes an invalid config shape.
       { schema: { metadata } } as any,
     ),
-  ).toThrow("A schema registry must include `default`.");
+  ).toThrow("A schema registry must include `default`");
 });
 
 test("should reject missing schema configuration", () => {

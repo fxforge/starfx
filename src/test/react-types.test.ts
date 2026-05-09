@@ -1,6 +1,8 @@
 import { describe, expectTypeOf, test } from "vitest";
+import type { ReactElement } from "react";
 import type { ThunkAction } from "../query/index.js";
 import {
+  Provider,
   type UseApiAction,
   type UseApiProps,
   type UseApiSimpleProps,
@@ -138,6 +140,22 @@ describe("react hook types", () => {
       >();
       expectTypeOf(useSchemaState).returns.toEqualTypeOf<typeof schema>();
       expectTypeOf(useTypedLoader).returns.toEqualTypeOf<LoaderState>();
+    });
+
+    test("Provider accepts stores with merged root state and narrower default schema", () => {
+      const baseSchema = createSchema({
+        users: slice.table<User>(),
+      });
+      const metadataSchema = createSchema({
+        metadata: slice.obj<Metadata>({}),
+      });
+      const store = createStore({
+        schema: { default: baseSchema, metadata: metadataSchema },
+      });
+
+      const renderProvider = () => Provider({ store, children: null });
+
+      expectTypeOf(renderProvider).returns.toEqualTypeOf<ReactElement>();
     });
   });
 

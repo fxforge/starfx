@@ -8,9 +8,11 @@ import {
 import { getIdFromAction } from "./action.js";
 import type { ThunkAction } from "./query/index.js";
 import {
+  type DefaultSchemaKey,
   type FxSchema,
   type FxStore,
   PERSIST_LOADER_ID,
+  type StoreSchemaRegistry,
 } from "./store/index.js";
 import type { LoaderOutput } from "./store/slice/loaders.js";
 import type { TableOutput } from "./store/slice/table.js";
@@ -180,9 +182,12 @@ export function createTypedHooks<O extends FxMap>(
  * }
  * ```
  */
-export function Provider<O extends FxMap>(props: {
-  store: FxStore<O>;
-  schema?: FxSchema<O>;
+export function Provider<
+  O extends FxMap,
+  TSchemas extends StoreSchemaRegistry = StoreSchemaRegistry<FxSchema<O>>,
+>(props: {
+  store: FxStore<O, TSchemas>;
+  schema?: TSchemas[DefaultSchemaKey];
   children?: React.ReactNode;
 }): React.ReactElement;
 

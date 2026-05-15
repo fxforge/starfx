@@ -32,7 +32,7 @@ a place for `starfx` and third-party functionality to hold their state.
 import { createSchema, slice } from "starfx";
 
 const [schema, initialState] = createSchema({
-  cache: slice.table(),
+  cache: slice.cache(),
   loaders: slice.loaders(),
 });
 ```

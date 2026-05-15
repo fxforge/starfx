@@ -12,6 +12,7 @@ import type {
   FxMap,
   FxSchema,
   FxStore,
+  SchemaMap,
   SchemaUpdater,
   SliceFromSchema,
   StoreUpdater,
@@ -19,13 +20,13 @@ import type {
 } from "./types.js";
 
 const defaultSchema = <O>(): O =>
-  ({ cache: slice.table(), loaders: slice.loaders() }) as O;
+  ({ cache: slice.cache(), loaders: slice.loaders() }) as O;
 
 /**
  * Builds the slice map and initial state from a slices configuration.
  * This is a helper for creating custom schema implementations.
  */
-export function buildSlices<O extends FxMap>(
+export function buildSlices<O extends SchemaMap>(
   slices: O,
 ): {
   db: { [K in keyof O]: FactoryReturn<O[K]> };
@@ -60,7 +61,7 @@ export interface CreateSchemaWithUpdaterOptions<
   initialize?: () => Operation<void>;
 }
 
-interface CreateSchemaOptions<O extends FxMap> {
+interface CreateSchemaOptions<O extends SchemaMap> {
   /**
    * Escape hatch for middleware values that are not typed to this schema.
    *
@@ -127,7 +128,7 @@ export const baseMiddlewares = [logMdw, notifyChannelMdw, notifyListenersMdw];
  * });
  * ```
  */
-export function createSchemaWithUpdater<O extends FxMap>(
+export function createSchemaWithUpdater<O extends SchemaMap>(
   slices: O,
   {
     middleware = [],
@@ -212,7 +213,7 @@ export function createSchemaWithUpdater<O extends FxMap>(
  * @param options - Schema options including `name` and custom middleware.
  * @returns A configured schema with `update`, `reset`, and generated slices.
  */
-export function createSchema<const O extends FxMap = FxMap>(
+export function createSchema<const O extends SchemaMap = FxMap>(
   slices?: O,
   options: CreateSchemaOptions<O> = {},
 ): FxSchema<O> {
@@ -231,7 +232,7 @@ export function createSchema<const O extends FxMap = FxMap>(
       >,
       next: Next,
     ) {
-      const store: FxStore<O> = yield* expectStore<O>();
+      const store = (yield* expectStore<FxSchema<O>>()) as FxStore<O>;
       const upds = (
         Array.isArray(ctx.updater) ? ctx.updater : [ctx.updater]
       ) as StoreUpdater<SliceFromSchema<O>>[];

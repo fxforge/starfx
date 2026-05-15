@@ -1,6 +1,12 @@
 import { expectTypeOf } from "vitest";
 import { call } from "../index.js";
-import { createSchema, createStore, select, slice } from "../store/index.js";
+import {
+  createSchema,
+  createStore,
+  expectStore,
+  select,
+  slice,
+} from "../store/index.js";
 import { expect, test } from "../test.js";
 
 interface TestState {
@@ -126,4 +132,24 @@ test("should keep multi-schema typing for schema registry variables", () => {
   const state = store.getState();
   expectTypeOf(state.users).toEqualTypeOf<BaseState["users"]>();
   expectTypeOf(state.metadata).toEqualTypeOf<MetadataState["metadata"]>();
+});
+
+test("expectStore should preserve merged state for schema registries", () => {
+  const baseSchema = createSchema({
+    users: slice.table<{ id: string; name: string }>(),
+  });
+  const metadataSchema = createSchema({
+    metadata: slice.obj<Record<string, string>>({}),
+  });
+  const schema = { default: baseSchema, metadata: metadataSchema };
+
+  function* operation() {
+    const runtimeStore = yield* expectStore<typeof schema>();
+    const state = runtimeStore.getState();
+
+    expectTypeOf(state.users).toEqualTypeOf<BaseState["users"]>();
+    expectTypeOf(state.metadata).toEqualTypeOf<MetadataState["metadata"]>();
+  }
+
+  void operation;
 });

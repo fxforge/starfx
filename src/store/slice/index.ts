@@ -8,19 +8,16 @@ import {
 import { type NumOutput, num } from "./num.js";
 import { type ObjOutput, obj } from "./obj.js";
 import { type StrOutput, str } from "./str.js";
-import { type TableOutput, table } from "./table.js";
+import { type TableOutput, cache, table } from "./table.js";
 
 export const slice = {
   str,
   num,
   table,
+  cache,
   any,
   obj,
   loaders,
-  /**
-   * @deprecated Use `slice.loaders` instead
-   */
-  loader: loaders,
 };
 export { defaultLoader, defaultLoaderItem };
 export type {

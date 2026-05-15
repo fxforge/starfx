@@ -1,10 +1,10 @@
 import {
   baseMiddlewares,
   compose,
-  type FxMap,
   type FxSchema,
   type FxStore,
   type Next,
+  type SchemaMap,
   type SchemaUpdater,
   type StoreUpdater,
   type UpdaterCtx,
@@ -17,7 +17,7 @@ import {
 import type { Draft } from "immer";
 import * as Y from "yjs";
 
-function createSnapshotUpdater<O extends FxMap>(
+function createSnapshotUpdater<O extends SchemaMap>(
   snapshot: SliceFromSchema<O>,
 ): StoreUpdater<SliceFromSchema<O>> {
   return (draft: Draft<SliceFromSchema<O>>) => {
@@ -34,7 +34,7 @@ function createSnapshotUpdater<O extends FxMap>(
   };
 }
 
-function* reconcileSnapshot<O extends FxMap>(
+function* reconcileSnapshot<O extends SchemaMap>(
   store: FxStore<O>,
   snapshot: SliceFromSchema<O>,
 ) {
@@ -75,7 +75,7 @@ function* reconcileSnapshot<O extends FxMap>(
  * Creates a Yjs-backed schema where state updates are synchronized via Y.Doc.
  * This demonstrates using createSchemaWithUpdater for custom state management.
  */
-export function createYjsSchema<O extends FxMap>(slices: O): FxSchema<O> {
+export function createYjsSchema<O extends SchemaMap>(slices: O): FxSchema<O> {
   console.log("Creating Y.Doc");
   const ydoc = new Y.Doc({ autoLoad: true });
   const root = ydoc.getMap();
@@ -86,7 +86,7 @@ export function createYjsSchema<O extends FxMap>(slices: O): FxSchema<O> {
 
   return createSchemaWithUpdater(slices, {
     *initialize() {
-      const store = yield* expectStore<O>();
+      const store = (yield* expectStore<FxSchema<O>>()) as FxStore<O>;
       const observation = createSignal<{
         events: Y.YEvent<Y.AbstractType<unknown>>[];
         transaction: Y.Transaction;
@@ -118,7 +118,7 @@ export function createYjsSchema<O extends FxMap>(slices: O): FxSchema<O> {
       }
     },
     *updateMdw(ctx, next) {
-      const store = yield* expectStore<O>();
+      const store = (yield* expectStore<FxSchema<O>>()) as FxStore<O>;
       const updaters = Array.isArray(ctx.updater) ? ctx.updater : [ctx.updater];
 
       ydoc.transact(() => {

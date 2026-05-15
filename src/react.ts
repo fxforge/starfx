@@ -1,3 +1,4 @@
+import type { Operation } from "effection";
 import React, { type ReactElement } from "react";
 import {
   Provider as ReduxProvider,
@@ -8,6 +9,7 @@ import {
 import { getIdFromAction } from "./action.js";
 import type { ThunkAction } from "./query/index.js";
 import {
+  type AnyFxSchema,
   type DefaultSchemaKey,
   type FxSchema,
   type FxStore,
@@ -16,7 +18,7 @@ import {
 } from "./store/index.js";
 import type { LoaderOutput } from "./store/slice/loaders.js";
 import type { TableOutput } from "./store/slice/table.js";
-import type { FxMap, SliceFromSchema } from "./store/types.js";
+import type { SchemaMap, SliceFromSchema } from "./store/types.js";
 import type { AnyState, LoaderState } from "./types.js";
 import type { ActionFn, ActionFnWithPayload } from "./types.js";
 
@@ -31,10 +33,10 @@ const {
   createElement: h,
 } = React;
 
-type WithLoadersMap = FxMap & { loaders: (n: string) => LoaderOutput };
-type WithCacheMap = FxMap & { cache: (n: string) => TableOutput<AnyState> };
+type WithLoadersMap = SchemaMap & { loaders: (n: string) => LoaderOutput };
+type WithCacheMap = SchemaMap & { cache: (n: string) => TableOutput<AnyState> };
 
-export type TypedHooks<O extends FxMap> = {
+export type TypedHooks<O extends SchemaMap> = {
   useSelector: <Selected>(
     selector: (state: SliceFromSchema<O>) => Selected,
     equalityFn?: (left: Selected, right: Selected) => boolean,
@@ -96,6 +98,12 @@ type UseApiReturn<A extends ApiActionInput> = A extends ActionFn
       ? UseApiAction<A>
       : never;
 
+type StoreContextValue = ReturnType<
+  typeof import("./store/context.js").StoreContext.expect
+> extends Operation<infer T>
+  ? T
+  : never;
+
 const SchemaContext = createContext<unknown>(null);
 
 export function useSelector<Selected = unknown>(
@@ -103,7 +111,7 @@ export function useSelector<Selected = unknown>(
   selector: (state: any) => Selected,
   equalityFn?: (left: Selected, right: Selected) => boolean,
 ): Selected;
-export function useSelector<O extends FxMap, Selected = unknown>(
+export function useSelector<O extends SchemaMap, Selected = unknown>(
   selector: (state: SliceFromSchema<O>) => Selected,
   equalityFn?: (left: Selected, right: Selected) => boolean,
 ): Selected;
@@ -113,12 +121,12 @@ export function useSelector(
   equalityFn?: (left: unknown, right: unknown) => boolean,
 ): unknown {
   return useReduxSelector(
-    selector as (state: SliceFromSchema<FxMap>) => unknown,
+    selector as (state: SliceFromSchema<SchemaMap>) => unknown,
     equalityFn,
   );
 }
 
-export function createTypedHooks<O extends FxMap>(
+export function createTypedHooks<O extends SchemaMap>(
   _schema: FxSchema<O>,
 ): TypedHooks<O> {
   const useTypedSelector: TypedHooks<O>["useSelector"] = (
@@ -183,7 +191,7 @@ export function createTypedHooks<O extends FxMap>(
  * ```
  */
 export function Provider<
-  O extends FxMap,
+  O extends SchemaMap,
   TSchemas extends StoreSchemaRegistry = StoreSchemaRegistry<FxSchema<O>>,
 >(props: {
   store: FxStore<O, TSchemas>;
@@ -192,20 +200,22 @@ export function Provider<
 }): React.ReactElement;
 
 export function Provider(props: {
-  // biome-ignore lint/suspicious/noExplicitAny: Provider must accept any typed schema/store pair; hook APIs preserve the specific types.
-  store: FxStore<any>;
-  // biome-ignore lint/suspicious/noExplicitAny: Provider must accept any typed schema/store pair; hook APIs preserve the specific types.
-  schema?: FxSchema<any>;
+  store: unknown;
+  schema?: unknown;
   children?: React.ReactNode;
 }): React.ReactElement {
-  const { store, schema, children } = props;
+  const { store, schema, children } = props as {
+    store: StoreContextValue;
+    schema?: AnyFxSchema;
+    children?: React.ReactNode;
+  };
   // Use provided schema or pull from store
   const schemaValue = schema ?? store.schema;
   const inner = h(SchemaContext.Provider, { value: schemaValue }, children);
   return h(ReduxProvider, { store, children: inner });
 }
 
-export function useSchema<O extends FxMap = FxMap>(): FxSchema<O> {
+export function useSchema<O extends SchemaMap = SchemaMap>(): FxSchema<O> {
   const ctx = useContext(SchemaContext);
   if (!ctx) throw new Error("No Schema available in context");
   return ctx as FxSchema<O>;
@@ -229,7 +239,7 @@ export function useSchemaWithCache<
   return ctx as FxSchema<O>;
 }
 
-export function useStore<O extends FxMap>() {
+export function useStore<O extends SchemaMap>() {
   return useReduxStore() as FxStore<O>;
 }
 

@@ -1,6 +1,6 @@
 import type { Draft, Immutable } from "immer";
 import { createSelector } from "reselect";
-import type { IdProp } from "../../types.js";
+import type { AnyState, IdProp } from "../../types.js";
 import type { BaseSchema, SliceState } from "../types.js";
 
 type TableData<Entity> = Record<IdProp, Entity>;
@@ -183,7 +183,7 @@ export function createTable<Entity = unknown>({
 }
 
 /**
- * Public table slice API used in `createSchema` definitions.
+ * Built-in table slice API used in `createSchema` definitions.
  *
  * @remarks
  * The table slice mimics a normalized entity table with `id -> entity` storage.
@@ -226,4 +226,21 @@ export function table<Entity = unknown>(
 ): (n: string) => TableOutput<Entity> {
   const { initialState, empty } = options;
   return (name: string) => createTable<Entity>({ name, empty, initialState });
+}
+
+/**
+ * Built-in cache slice API used by starfx query helpers.
+ *
+ * @remarks
+ * This is equivalent to `slice.table<AnyState>()`, but makes the built-in
+ * cache convention explicit and preserves the broad cache entity type expected
+ * by cache-aware helpers.
+ */
+export function cache(
+  options: {
+    initialState?: Record<IdProp, AnyState>;
+    empty?: AnyState | (() => AnyState);
+  } = {},
+): (n: string) => TableOutput<AnyState> {
+  return table<AnyState>(options);
 }

@@ -59,18 +59,28 @@ export type Output<O extends { [key: string]: BaseSchema<unknown> }> = {
 export type SliceState<T> = Record<string, Immutable<T>>;
 
 /**
+ * Neutral map of slice factories used to build schema state.
+ */
+export interface SchemaMap {
+  [key: string]: ((name: string) => BaseSchema<unknown>) | undefined;
+}
+
+/**
+ * Built-in slice factories used by starfx helpers.
+ */
+export interface BuiltinSchemaMap {
+  loaders?: (s: string) => LoaderOutput;
+  cache?: (s: string) => TableOutput<AnyState>;
+}
+
+/**
  * Map of slice factories used when creating a schema via createSchema.
  *
  * @remarks
  * Includes optional default `loaders` and `cache` slices while allowing
  * additional user-defined factories.
  */
-export interface FxMap {
-  // keep a typed shape for default slices while allowing user-defined slices
-  loaders?: (s: string) => LoaderOutput;
-  cache?: (s: string) => TableOutput<AnyState>;
-  [key: string]: ((name: string) => BaseSchema<unknown>) | undefined;
-}
+export type FxMap = SchemaMap & BuiltinSchemaMap;
 
 // biome-ignore lint/suspicious/noExplicitAny: used only to represent an arbitrary schema instance in store composition helpers.
 export type AnyFxSchema = FxSchema<any>;
@@ -101,7 +111,7 @@ type Simplify<T> = { [K in keyof T]: T[K] } & {};
 export type MergeSchemaRegistryMaps<TSchemas extends StoreSchemaRegistry> =
   UnionToIntersection<
     SchemaMapOf<TSchemas[keyof TSchemas]>
-  > extends infer O extends FxMap
+  > extends infer O extends SchemaMap
     ? Simplify<O>
     : never;
 
@@ -112,7 +122,7 @@ export type FactoryInitial<T> = FactoryReturn<
 > extends BaseSchema<infer IS>
   ? IS
   : never;
-export type SliceFromSchema<O extends FxMap> = {
+export type SliceFromSchema<O extends SchemaMap> = {
   [K in keyof O]: FactoryInitial<O[K]>;
 };
 
@@ -128,7 +138,7 @@ type BuiltInSchemaUpdater =
   | SliceActionUpdater<LoaderOutput>
   | SliceActionUpdater<TableOutput<AnyState>>;
 
-export type SchemaUpdater<O extends FxMap> =
+export type SchemaUpdater<O extends SchemaMap> =
   | StoreUpdater<SliceFromSchema<O>>
   | BuiltInSchemaUpdater
   | {
@@ -141,7 +151,7 @@ export type SchemaUpdater<O extends FxMap> =
  * @remarks
  * Extends generated helpers with schema lifecycle/update APIs.
  */
-export type FxSchema<O extends FxMap = FxMap> = {
+export type FxSchema<O extends SchemaMap = FxMap> = {
   [K in keyof O]: FactoryReturn<NonNullable<O[K]>>;
 } & {
   initialize?: () => Operation<void>;
@@ -165,7 +175,7 @@ export type FxSchema<O extends FxMap = FxMap> = {
  * Compatible with react-redux store expectations for interop.
  */
 export interface FxStore<
-  O extends FxMap,
+  O extends SchemaMap,
   TSchemas extends StoreSchemaRegistry = StoreSchemaRegistry<FxSchema<O>>,
 > {
   getScope: () => Scope;

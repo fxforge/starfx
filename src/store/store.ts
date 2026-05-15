@@ -14,15 +14,21 @@ import { createRun } from "./run.js";
 import { DEFAULT_SCHEMA_KEY } from "./types.js";
 import type {
   AnyFxSchema,
-  FxMap,
   FxSchema,
   FxStore,
   Listener,
   MergeSchemaRegistryMaps,
+  SchemaMap,
   SliceFromSchema,
   StoreSchemaRegistry,
   StoreUpdater,
 } from "./types.js";
+
+type StoreContextValue = ReturnType<
+  typeof StoreContext.expect
+> extends Operation<infer T>
+  ? T
+  : never;
 const stubMsg = "This is merely a stub, not implemented";
 
 let id = 0;
@@ -39,7 +45,7 @@ function observable() {
   };
 }
 
-export interface CreateStore<O extends FxMap> {
+export interface CreateStore<O extends SchemaMap> {
   scope?: Scope;
   schema: FxSchema<O>;
   /**
@@ -99,7 +105,7 @@ export const ListenersContext = createContext<Set<Listener>>(
  * const store = createStore({ schema });
  * ```
  */
-export function createStore<O extends FxMap>(
+export function createStore<O extends SchemaMap>(
   options: CreateStore<O>,
 ): FxStore<O>;
 export function createStore<const TSchemas extends StoreSchemaRegistry>(
@@ -109,9 +115,9 @@ export function createStore({
   scope: initScope,
   schema: schemaInput,
   tasks = [],
-}: CreateStore<FxMap> | CreateStoreMulti<StoreSchemaRegistry>): FxStore<
-  FxMap,
-  StoreSchemaRegistry<FxSchema<FxMap>>
+}: CreateStore<SchemaMap> | CreateStoreMulti<StoreSchemaRegistry>): FxStore<
+  SchemaMap,
+  StoreSchemaRegistry<FxSchema<SchemaMap>>
 > {
   if (!schemaInput) {
     throw new Error("At least one schema must be provided.");
@@ -121,11 +127,11 @@ export function createStore({
     throw new Error("A schema registry must include `default`");
   }
 
-  const schemasMap: StoreSchemaRegistry<FxSchema<FxMap>> = isSchemaRegistry(
+  const schemasMap: StoreSchemaRegistry<FxSchema<SchemaMap>> = isSchemaRegistry(
     schemaInput,
   )
-    ? (schemaInput as StoreSchemaRegistry<FxSchema<FxMap>>)
-    : { [DEFAULT_SCHEMA_KEY]: schemaInput as FxSchema<FxMap> };
+    ? (schemaInput as StoreSchemaRegistry<FxSchema<SchemaMap>>)
+    : { [DEFAULT_SCHEMA_KEY]: schemaInput as FxSchema<SchemaMap> };
   const schemas = Object.values(schemasMap);
   const baseSchema = schemasMap[DEFAULT_SCHEMA_KEY];
 
@@ -144,7 +150,7 @@ export function createStore({
     (acc, schema) => {
       return Object.assign(acc, schema.initialState);
     },
-    {} as SliceFromSchema<FxMap>,
+    {} as SliceFromSchema<SchemaMap>,
   );
   let state = initialState;
 
@@ -156,10 +162,10 @@ export function createStore({
     return state;
   }
 
-  function setState(upds: StoreUpdater<SliceFromSchema<FxMap>>[]) {
+  function setState(upds: StoreUpdater<SliceFromSchema<SchemaMap>>[]) {
     const nextState = produceWithPatches(
       state,
-      (draft: Draft<SliceFromSchema<FxMap>>) => {
+      (draft: Draft<SliceFromSchema<SchemaMap>>) => {
         upds.forEach((updater) => updater(draft));
       },
     );
@@ -183,7 +189,7 @@ export function createStore({
 
   const run = createRun(scope);
 
-  const store: FxStore<FxMap, StoreSchemaRegistry<FxSchema<FxMap>>> = {
+  const store: FxStore<SchemaMap, StoreSchemaRegistry<FxSchema<SchemaMap>>> = {
     getScope,
     getState,
     setState,
@@ -197,9 +203,9 @@ export function createStore({
     // stubs so `react-redux` is happy
     replaceReducer(
       _nextReducer: (
-        s: SliceFromSchema<FxMap>,
+        s: SliceFromSchema<SchemaMap>,
         a: AnyAction,
-      ) => SliceFromSchema<FxMap>,
+      ) => SliceFromSchema<SchemaMap>,
     ): void {
       throw new Error(stubMsg);
     },
@@ -207,7 +213,7 @@ export function createStore({
     [Symbol.observable]: observable,
   };
 
-  scope.set(StoreContext, store as FxStore<FxMap>);
+  scope.set(StoreContext, store as StoreContextValue);
 
   run(function* (): Operation<void> {
     const schemaInit = schemas

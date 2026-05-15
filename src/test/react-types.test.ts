@@ -1,5 +1,5 @@
-import { describe, expectTypeOf, test } from "vitest";
 import type { ReactElement } from "react";
+import { describe, expectTypeOf, test } from "vitest";
 import type { ThunkAction } from "../query/index.js";
 import {
   Provider,
@@ -54,7 +54,7 @@ describe("react hook types", () => {
   describe("global hooks without schema hints", () => {
     test("typed schema/store creation works with react-facing types", () => {
       const schema = createSchema({
-        cache: slice.table(),
+        cache: slice.table<AnyState>(),
         loaders: slice.loaders(),
         metadata: slice.obj<Metadata>({}),
         users: slice.table<User>(),
@@ -67,7 +67,7 @@ describe("react hook types", () => {
 
     test("bare useSelector works with schema selectors", () => {
       const schema = createSchema({
-        cache: slice.table(),
+        cache: slice.cache(),
         loaders: slice.loaders(),
         metadata: slice.obj<Metadata>({}),
         users: slice.table<User>(),
@@ -107,7 +107,7 @@ describe("react hook types", () => {
   describe("schema-bound typed hooks", () => {
     test("useSelector exposes schema state to userland", () => {
       const schema = createSchema({
-        cache: slice.table(),
+        cache: slice.cache(),
         loaders: slice.loaders(),
         metadata: slice.obj<Metadata>({}),
         users: slice.table<User>(),
@@ -125,7 +125,7 @@ describe("react hook types", () => {
 
     test("createTypedHooks infers all hook state from schema input", () => {
       const schema = createSchema({
-        cache: slice.table(),
+        cache: slice.cache(),
         loaders: slice.loaders(),
         metadata: slice.obj<Metadata>({}),
         users: slice.table<User>(),

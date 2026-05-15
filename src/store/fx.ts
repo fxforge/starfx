@@ -11,7 +11,8 @@ import type {
 import { expectStore } from "./context.js";
 import type { LoaderOutput } from "./slice/loaders.js";
 import type {
-  FxMap,
+  FxSchema,
+  SchemaMap,
   SliceFromSchema,
   StoreUpdater,
   UpdaterCtx,
@@ -24,11 +25,11 @@ import type {
 export function* updateStore<S extends AnyState>(
   updater: StoreUpdater<S> | StoreUpdater<S>[],
 ): Operation<UpdaterCtx<S>> {
-  const store = yield* expectStore<FxMap>();
+  const store = yield* expectStore<FxSchema<SchemaMap>>();
   const ctx = yield* store.schema.update(
     updater as
-      | StoreUpdater<SliceFromSchema<FxMap>>
-      | StoreUpdater<SliceFromSchema<FxMap>>[],
+      | StoreUpdater<SliceFromSchema<SchemaMap>>
+      | StoreUpdater<SliceFromSchema<SchemaMap>>[],
   );
   return ctx as UpdaterCtx<S>;
 }
@@ -37,7 +38,7 @@ export function* select<S, Args extends unknown[], R>(
   selectorFn: (s: S, ...args: Args) => R,
   ...args: Args
 ): Operation<R> {
-  const store = yield* expectStore<FxMap>();
+  const store = yield* expectStore<FxSchema<SchemaMap>>();
   return selectorFn(store.getState() as S, ...args);
 }
 

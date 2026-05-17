@@ -86,8 +86,7 @@ every **5 minutes**, mimicking the basic features of `react-query`.
 import { createApi, createSchema, createStore, mdw, timer } from "starfx";
 import { Provider, useCache } from "starfx/react";
 
-const [schema, initialState] = createSchema();
-const store = createStore({ initialState });
+const schema = createSchema();
 
 const api = createApi();
 // mdw = middleware
@@ -102,7 +101,7 @@ const fetchRepo = api.get(
   api.cache(),
 );
 
-store.run(api.register);
+const store = createStore({ schema, tasks: [api.register] });
 
 function App() {
   return (

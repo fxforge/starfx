@@ -35,7 +35,7 @@ For thunks you can use `mdw.loader()` which will track the status of a thunk.
 ```ts
 import { createThunks, mdw } from "starfx";
 // imaginary schema
-import { initialState, schema } from "./schema";
+import { schema } from "./schema";
 
 const thunks = createThunks();
 thunks.use(mdw.loader(schema));
@@ -45,7 +45,7 @@ const go = thunks.create("go", function* (ctx, next) {
   throw new Error("boom!");
 });
 
-const store = createStore({ initialState });
+const store = createStore({ schema });
 store.dispatch(go());
 schema.loaders.selectById(store.getState(), { id: `${go}` });
 // status = "error"; message = "boom!"

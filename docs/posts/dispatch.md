@@ -16,12 +16,10 @@ The type signature of `dispatch`:
 type Dispatch = (a: Action | Action[]) => any;
 ```
 
-Within `starfx`, the `dispatch` function lives on the store.
-
 ```ts
 const { createSchema, createStore } from "starfx";
-const [schema, initialState] = createSchema();
-const store = createStore({ initialState });
+const schema = createSchema();
+const store = createStore({ schema });
 
 store.dispatch({ type: "action", payload: {} });
 ```

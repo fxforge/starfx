@@ -55,12 +55,12 @@ interface User {
 }
 
 // app-wide database for ui, api data, or anything that needs reactivity
-const [schema, initialState] = createSchema({
+const schema = createSchema({
   cache: slice.cache(),
   loaders: slice.loaders(),
   users: slice.table<User>(),
 });
-type WebState = typeof initialState;
+type WebState = typeof schema.initialState;
 
 // just a normal endpoint
 const fetchUsers = api.get<never, User[]>(
@@ -93,15 +93,14 @@ const fetchUsers = api.get<never, User[]>(
   },
 );
 
-const store = createStore(schema);
-store.run(api.register);
+const store = createStore({ schema, tasks: [api.register] });
 store.dispatch(fetchUsers());
 ```
 
 # How to update state
 
-There are **three** ways to update state, each with varying degrees of type
-safety:
+There are **two** common ways to update state, each with varying degrees of
+type safety:
 
 ```ts
 import { updateStore } from "starfx";
@@ -112,16 +111,12 @@ function*() {
   // no types
   yield* updateStore([/* ... */]);
 }
-
-store.run(function*() {
-  // no types
-  yield* store.update([/* ... */]);
-});
 ```
 
 `schema.update` has the highest type safety because it knows your state shape.
-The other methods are more generic and the user will have to provide types to
-them manually.
+`updateStore` is more generic and the user will have to provide types to it
+manually. For lower-level integration, the store also exposes `setState([...])`
+directly.
 
 # Updater function
 

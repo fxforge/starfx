@@ -3,13 +3,13 @@ title: Endpoints
 description: endpoints are tasks for managing HTTP requests
 ---
 
-An endpoint is just a specialized thunk designed to manage http requests. It has
+An endpoint is a specialized thunk designed to manage http requests. It has
 a supervisor, it has a middleware stack, and it hijacks the unique id for our
 thunks and turns it into a router.
 
 ```ts
 import { createApi, createStore, mdw } from "starfx";
-import { initialState, schema } from "./schema";
+import { schema } from "./schema";
 
 const api = createApi();
 // composition of handy middleware for createApi to function
@@ -32,8 +32,7 @@ export const updateUser = api.post<{ id: string; name: string }>(
   },
 );
 
-const store = createStore(initialState);
-store.run(api.register);
+const store = createStore({ schema, tasks: [api.register] });
 
 store.dispatch(fetchUsers());
 // now accessible with useCache(fetchUsers)
@@ -331,7 +330,7 @@ function deserializeComment(com: any): Comment {
   };
 }
 
-const [schema, initialState] = createSchema({
+const schema = createSchema({
   cache: slice.cache(),
   loaders: slice.loaders(),
   token: slice.str(),
@@ -339,7 +338,7 @@ const [schema, initialState] = createSchema({
   people: slice.table<Person>(),
   comments: slice.table<Comment>(),
 });
-type WebState = typeof initialState;
+type WebState = typeof schema.initialState;
 
 const api = createApi();
 api.use(mdw.api({ schema }));

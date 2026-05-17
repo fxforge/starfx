@@ -31,8 +31,8 @@ a place for `starfx` and third-party functionality to hold their state.
 ```ts
 import { createSchema, slice } from "starfx";
 
-const [schema, initialState] = createSchema({
-  cache: slice.table(),
+const schema = createSchema({
+  cache: slice.cache(),
   loaders: slice.loaders(),
 });
 ```
@@ -249,10 +249,10 @@ export function counter(initialState?: number) {
   return (name: string) => createCounter<AnyState>({ name, initialState });
 }
 
-const [schema, initialState] = createSchema({
+const schema = createSchema({
   counter: counter(100),
 });
-const store = createStore(initialState);
+const store = createStore({ schema });
 
 store.run(function* () {
   yield* schema.update([

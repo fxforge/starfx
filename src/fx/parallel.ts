@@ -1,10 +1,11 @@
 import type { Channel, Operation, Result, Task } from "effection";
-import { createChannel, resource, spawn } from "effection";
+import { createChannel, resource, spawn, withResolvers } from "effection";
 import { safe } from "./safe.js";
 
 export interface ParallelRet<T> extends Operation<Result<T>[]> {
   sequence: Channel<Result<T>, void>;
   immediate: Channel<Result<T>, void>;
+  started: Operation<void>;
 }
 
 /**
@@ -88,6 +89,7 @@ export function parallel<T, TArgs extends unknown[] = []>(
   const sequence = createChannel<Result<T>>();
   const immediate = createChannel<Result<T>>();
   const results: Result<T>[] = [];
+  const started = withResolvers<void>();
 
   return resource<ParallelRet<T>>(function* (provide) {
     const task = yield* spawn(function* () {
@@ -102,6 +104,8 @@ export function parallel<T, TArgs extends unknown[] = []>(
         );
       }
 
+      started.resolve();
+
       for (const tsk of tasks) {
         const res = yield* tsk;
         results.push(res);
@@ -115,6 +119,7 @@ export function parallel<T, TArgs extends unknown[] = []>(
     yield* provide({
       sequence,
       immediate,
+      started: started.operation,
       *[Symbol.iterator]() {
         yield* task;
         return results;

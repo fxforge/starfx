@@ -8,20 +8,22 @@ import {
 import { expect, test } from "../test.js";
 
 test("should batch notify subscribers based on mdw", async () => {
-  const [schema, initialState] = createSchema({
-    cache: slice.table({ empty: {} }),
-    loaders: slice.loaders(),
-  });
-  const store = createStore({
-    initialState,
-    middleware: [createBatchMdw(queueMicrotask)],
-  });
+  const schema = createSchema(
+    {
+      cache: slice.table({ empty: {} }),
+      loaders: slice.loaders(),
+    },
+    {
+      middleware: [createBatchMdw(queueMicrotask)],
+    },
+  );
+  const store = createStore({ schema });
   let counter = 0;
   store.subscribe(() => {
     counter += 1;
   });
   await store.run(function* () {
-    const group: any = yield* parallel([
+    const group = yield* parallel([
       () => schema.update(schema.cache.add({ "1": "one" })),
       () => schema.update(schema.cache.add({ "2": "two" })),
       () => schema.update(schema.cache.add({ "3": "three" })),

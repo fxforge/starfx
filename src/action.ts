@@ -3,6 +3,7 @@ import {
   type Signal,
   SignalQueueFactory,
   type Stream,
+  type Task,
   call,
   createContext,
   createSignal,
@@ -12,8 +13,13 @@ import {
 } from "effection";
 import { type ActionPattern, matcher } from "./matcher.js";
 import { createFilterQueue } from "./queue.js";
-import type { Action, ActionWithPayload, AnyAction } from "./types.js";
-import type { ActionFnWithPayload } from "./types.js";
+import type {
+  Action,
+  ActionFn,
+  ActionFnWithPayload,
+  ActionWithPayload,
+  AnyAction,
+} from "./types.js";
 
 /**
  * Shared action signal used by `put`, `useActions`, and related helpers.
@@ -59,7 +65,9 @@ export function useActions(pattern: ActionPattern): Stream<AnyAction, void> {
     [Symbol.iterator]: function* () {
       const actions = yield* ActionContext.expect();
       const match = matcher(pattern);
-      yield* SignalQueueFactory.set(() => createFilterQueue(match) as any);
+      yield* SignalQueueFactory.set(<T, TClose>() =>
+        createFilterQueue<T, TClose>((value) => match(value as AnyAction)),
+      );
       return yield* actions;
     },
   };
@@ -235,7 +243,7 @@ export function* takeLatest<T>(
   op: (action: AnyAction) => Operation<T>,
 ): Operation<void> {
   const fd = useActions(pattern);
-  let lastTask;
+  let lastTask: Task<T> | undefined;
 
   for (const action of yield* each(fd)) {
     if (lastTask) {
@@ -320,7 +328,10 @@ export function* waitFor(predicate: () => Operation<boolean>): Operation<void> {
  * Extract the deterministic id from an action or action-creator.
  */
 export function getIdFromAction(
-  action: ActionWithPayload<{ key: string }> | ActionFnWithPayload,
+  action:
+    | ActionWithPayload<{ key: string }>
+    | ActionFn
+    | ActionFnWithPayload<never>,
 ): string {
   return typeof action === "function" ? action.toString() : action.payload.key;
 }

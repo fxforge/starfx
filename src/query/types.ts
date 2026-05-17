@@ -34,7 +34,7 @@ export interface ThunkCtx<P = any> extends Payload<P> {
  * Thunk context that may be associated with a loader.
  */
 export interface ThunkCtxWLoader extends ThunkCtx {
-  loader: Omit<LoaderPayload<any>, "id"> | null;
+  loader: Omit<LoaderPayload, "id"> | null;
 }
 
 /**
@@ -84,7 +84,7 @@ export interface FetchJsonCtx<P = any, ApiSuccess = any, ApiError = any>
 export interface ApiCtx<Payload = any, ApiSuccess = any, ApiError = any>
   extends FetchJsonCtx<Payload, ApiSuccess, ApiError> {
   actions: Action[];
-  loader: Omit<LoaderPayload<any>, "id"> | null;
+  loader: Omit<LoaderPayload, "id"> | null;
   // should we cache ctx.json?
   cache: boolean;
   // should we use mdw.stub?

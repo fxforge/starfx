@@ -1,7 +1,7 @@
-import { useDispatch, useSelector } from "starfx/react";
-import { fetchUsers, schema } from "./api";
+import { useDispatch } from "starfx/react";
+import { fetchUsers, schema, useSelector } from "./api";
 
-export function App({ id }) {
+export function App({ id }: { id: string }) {
   const dispatch = useDispatch();
   const user = useSelector((s) => schema.users.selectById(s, { id }));
   const userList = useSelector(schema.users.selectTableAsList);

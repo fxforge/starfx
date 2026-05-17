@@ -1,17 +1,34 @@
 import {
-  Ok,
+  type Operation,
   type Scope,
   createContext,
   createScope,
   createSignal,
 } from "effection";
-import { enablePatches, produceWithPatches } from "immer";
-import { API_ACTION_PREFIX, ActionContext, emit } from "../action.js";
-import { type BaseMiddleware, compose } from "../compose.js";
-import type { AnyAction, AnyState, Next } from "../types.js";
-import { StoreContext, StoreUpdateContext } from "./context.js";
+import { type Draft, enablePatches, produceWithPatches } from "immer";
+import { ActionContext, emit } from "../action.js";
+import { parallel } from "../fx/parallel.js";
+import type { AnyAction } from "../types.js";
+import { StoreContext } from "./context.js";
 import { createRun } from "./run.js";
-import type { FxStore, Listener, StoreUpdater, UpdaterCtx } from "./types.js";
+import { DEFAULT_SCHEMA_KEY } from "./types.js";
+import type {
+  AnyFxSchema,
+  FxSchema,
+  FxStore,
+  Listener,
+  MergeSchemaRegistryMaps,
+  SchemaMap,
+  SliceFromSchema,
+  StoreSchemaRegistry,
+  StoreUpdater,
+} from "./types.js";
+
+type StoreContextValue = ReturnType<
+  typeof StoreContext.expect
+> extends Operation<infer T>
+  ? T
+  : never;
 const stubMsg = "This is merely a stub, not implemented";
 
 let id = 0;
@@ -28,13 +45,32 @@ function observable() {
   };
 }
 
-export interface CreateStore<S extends AnyState> {
+export interface CreateStore<O extends SchemaMap> {
   scope?: Scope;
-  initialState: S;
-  middleware?: BaseMiddleware<UpdaterCtx<S>>[];
+  schema: FxSchema<O>;
+  /**
+   * Long-lived startup operations to run inside the store scope.
+   *
+   * These tasks are lifecycle-managed by the store, but `createStore()` does
+   * not guarantee that arbitrary custom tasks have reached a caller-defined
+   * ready state before the first dispatch. If a custom task needs stronger
+   * startup coordination, it should expose and manage that readiness explicitly
+   * using existing primitives.
+   */
+  tasks?: (() => Operation<void>)[];
+}
+
+export interface CreateStoreMulti<TSchemas extends StoreSchemaRegistry> {
+  scope?: Scope;
+  schema: TSchemas;
+  tasks?: (() => Operation<void>)[];
 }
 
 export const IdContext = createContext("starfx:id", 0);
+export const ListenersContext = createContext<Set<Listener>>(
+  "starfx:store:listeners",
+  new Set<Listener>(),
+);
 
 /**
  * Creates a new FxStore instance for managing application state.
@@ -45,56 +81,78 @@ export const IdContext = createContext("starfx:id", 0);
  * executing operations within the store's scope.
  *
  * Unlike traditional Redux stores, this store does not use reducers. Instead,
- * state updates are performed using `immer`-based updater functions that directly
- * mutate a draft state. This design is inspired by the observation that reducers
- * were originally created to ensure immutability, but with `immer` that concern
- * is handled automatically.
+ * state updates are performed with immer-based updater functions that mutate
+ * draft state.
  *
- * @typeParam S - The shape of the root state object.
- *
+ * @typeParam O - Slice factory map used to build schema/state shape.
  * @param options - Store configuration object.
- * @param options.initialState - The initial state for the store.
- * @param options.scope - Optional Effection scope to use. If omitted, a new scope is created.
- * @param options.middleware - Optional array of store middleware.
- * @returns A fully configured {@link FxStore} instance.
- *
- * @see {@link createSchema} for creating the schema and initial state.
- * @see {@link https://immerjs.github.io/immer/update-patterns | Immer update patterns}
+ * @param options.scope - Optional Effection scope to use.
+ * @param options.schema - Single schema or a keyed schema registry whose
+ * `default` entry defines `store.schema`.
+ * @param options.tasks - Long-lived startup operations to run in the
+ * store scope. Arbitrary custom tasks are started with the store, but they are
+ * not awaited to a caller-defined ready state.
+ * @returns A fully configured store instance.
  *
  * @example
  * ```ts
- * import { createSchema, createStore, slice } from "starfx";
- *
- * interface User {
- *   id: string;
- *   name: string;
- * }
- *
- * const [schema, initialState] = createSchema({
+ * const schema = createSchema({
+ *   users: slice.table<User>(),
  *   cache: slice.table(),
  *   loaders: slice.loaders(),
- *   users: slice.table<User>(),
  * });
  *
- * const store = createStore({ initialState });
- * store.run(api.register);
- * store.dispatch(fetchUsers());
+ * const store = createStore({ schema });
  * ```
  */
-export function createStore<S extends AnyState>({
-  initialState,
+export function createStore<O extends SchemaMap>(
+  options: CreateStore<O>,
+): FxStore<O>;
+export function createStore<const TSchemas extends StoreSchemaRegistry>(
+  options: CreateStoreMulti<TSchemas>,
+): FxStore<MergeSchemaRegistryMaps<TSchemas>, TSchemas>;
+export function createStore({
   scope: initScope,
-  middleware = [],
-}: CreateStore<S>): FxStore<S> {
+  schema: schemaInput,
+  tasks = [],
+}: CreateStore<SchemaMap> | CreateStoreMulti<StoreSchemaRegistry>): FxStore<
+  SchemaMap,
+  StoreSchemaRegistry<FxSchema<SchemaMap>>
+> {
+  if (!schemaInput) {
+    throw new Error("At least one schema must be provided.");
+  }
+
+  if (!isFxSchema(schemaInput) && !isSchemaRegistry(schemaInput)) {
+    throw new Error("A schema registry must include `default`");
+  }
+
+  const schemasMap: StoreSchemaRegistry<FxSchema<SchemaMap>> = isSchemaRegistry(
+    schemaInput,
+  )
+    ? (schemaInput as StoreSchemaRegistry<FxSchema<SchemaMap>>)
+    : { [DEFAULT_SCHEMA_KEY]: schemaInput as FxSchema<SchemaMap> };
+  const schemas = Object.values(schemasMap);
+  const baseSchema = schemasMap[DEFAULT_SCHEMA_KEY];
+
   const [scope] = initScope ? [initScope] : createScope();
 
-  let state = initialState;
   const listeners = new Set<Listener>();
-  enablePatches();
+  scope.set(ListenersContext, listeners);
 
   const signal = createSignal<AnyAction, void>();
   scope.set(ActionContext, signal);
   scope.set(IdContext, id++);
+
+  enablePatches();
+  // Build initial state from all schemas
+  const initialState = schemas.reduce(
+    (acc, schema) => {
+      return Object.assign(acc, schema.initialState);
+    },
+    {} as SliceFromSchema<SchemaMap>,
+  );
+  let state = initialState;
 
   function getScope() {
     return scope;
@@ -104,120 +162,50 @@ export function createStore<S extends AnyState>({
     return state;
   }
 
-  function subscribe(fn: Listener) {
-    listeners.add(fn);
-    return () => listeners.delete(fn);
-  }
+  function setState(upds: StoreUpdater<SliceFromSchema<SchemaMap>>[]) {
+    const nextState = produceWithPatches(
+      state,
+      (draft: Draft<SliceFromSchema<SchemaMap>>) => {
+        upds.forEach((updater) => updater(draft));
+      },
+    );
 
-  function* updateMdw(ctx: UpdaterCtx<S>, next: Next) {
-    const upds: StoreUpdater<S>[] = [];
-
-    if (Array.isArray(ctx.updater)) {
-      upds.push(...ctx.updater);
-    } else {
-      upds.push(ctx.updater);
-    }
-
-    const [nextState, patches, _] = produceWithPatches(getState(), (draft) => {
-      // TODO: check for return value inside updater
-      upds.forEach((updater) => updater(draft as any));
-    });
-    ctx.patches = patches;
-
-    // set the state!
-    state = nextState;
-
-    yield* next();
-  }
-
-  function* logMdw(ctx: UpdaterCtx<S>, next: Next) {
-    dispatch({
-      type: `${API_ACTION_PREFIX}store`,
-      payload: ctx,
-    });
-    yield* next();
-  }
-
-  function* notifyChannelMdw(_: UpdaterCtx<S>, next: Next) {
-    const chan = yield* StoreUpdateContext.expect();
-    yield* chan.send();
-    yield* next();
-  }
-
-  function* notifyListenersMdw(_: UpdaterCtx<S>, next: Next) {
-    listeners.forEach((f) => f());
-    yield* next();
-  }
-
-  function createUpdater() {
-    const fn = compose<UpdaterCtx<S>>([
-      updateMdw,
-      ...middleware,
-      logMdw,
-      notifyChannelMdw,
-      notifyListenersMdw,
-    ]);
-
-    return fn;
-  }
-
-  const mdw = createUpdater();
-  function* update(updater: StoreUpdater<S> | StoreUpdater<S>[]) {
-    const ctx = {
-      updater,
-      patches: [],
-      result: Ok(undefined),
-    };
-
-    yield* mdw(ctx);
-
-    if (!ctx.result.ok) {
-      dispatch({
-        type: `${API_ACTION_PREFIX}store`,
-        payload: ctx.result.error,
-      });
-    }
-
-    return ctx;
-  }
-
-  function dispatch(action: AnyAction | AnyAction[]) {
-    emit({ signal, action });
+    state = nextState[0];
+    return nextState;
   }
 
   function getInitialState() {
     return initialState;
   }
 
-  function* reset(ignoreList: (keyof S)[] = []) {
-    return yield* update((s) => {
-      const keep = ignoreList.reduce<S>(
-        (acc, key) => {
-          acc[key] = s[key];
-          return acc;
-        },
-        { ...initialState },
-      );
-
-      Object.keys(s).forEach((key: keyof S) => {
-        s[key] = keep[key];
-      });
-    });
+  function subscribe(fn: Listener) {
+    listeners.add(fn);
+    return () => listeners.delete(fn);
   }
 
-  const store: FxStore<S> = {
+  function dispatch(action: AnyAction | AnyAction[]) {
+    emit({ signal, action });
+  }
+
+  const run = createRun(scope);
+
+  const store: FxStore<SchemaMap, StoreSchemaRegistry<FxSchema<SchemaMap>>> = {
     getScope,
     getState,
+    setState,
     subscribe,
-    update,
-    reset,
-    run: createRun(scope),
+    schema: baseSchema,
+    schemas: schemasMap,
+    run,
     // instead of actions relating to store mutation, they
     // refer to pieces of business logic -- that can also mutate state
     dispatch,
     // stubs so `react-redux` is happy
-    replaceReducer<S = any>(
-      _nextReducer: (_s: S, _a: AnyAction) => void,
+    replaceReducer(
+      _nextReducer: (
+        s: SliceFromSchema<SchemaMap>,
+        a: AnyAction,
+      ) => SliceFromSchema<SchemaMap>,
     ): void {
       throw new Error(stubMsg);
     },
@@ -225,11 +213,38 @@ export function createStore<S extends AnyState>({
     [Symbol.observable]: observable,
   };
 
-  scope.set(StoreContext, store as FxStore<AnyState>);
+  scope.set(StoreContext, store as StoreContextValue);
+
+  run(function* (): Operation<void> {
+    const schemaInit = schemas
+      .map((s) => s.initialize)
+      .filter(
+        (init): init is () => Operation<void> => typeof init === "function",
+      );
+
+    const group = yield* parallel([...schemaInit, ...tasks]);
+    yield* group;
+  });
+
   return store;
 }
 
-/**
- * @deprecated use {@link createStore}
- */
-export const configureStore = createStore;
+function isSchemaRegistry(
+  schema: AnyFxSchema | StoreSchemaRegistry,
+): schema is StoreSchemaRegistry {
+  return (
+    typeof schema === "object" &&
+    schema !== null &&
+    DEFAULT_SCHEMA_KEY in schema &&
+    isFxSchema(schema[DEFAULT_SCHEMA_KEY])
+  );
+}
+
+function isFxSchema(value: unknown): value is AnyFxSchema {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "update" in value &&
+    "initialState" in value
+  );
+}

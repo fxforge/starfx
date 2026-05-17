@@ -2,14 +2,14 @@
   "$schema": "https://json.schemastore.org/tsconfig",
   "compilerOptions": {
     "baseUrl": ".",
-    "types": ["vitest/globals"],
+    "forceConsistentCasingInFileNames": true,
+    "ignoreDeprecations": "5.0",
     "lib": ["dom", "dom.iterable", "esnext"],
     "allowJs": true,
     "skipLibCheck": true,
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,
     "strict": true,
-    "forceConsistentCasingInFileNames": true,
     "target": "esnext",
     "module": "esnext",
     "moduleResolution": "bundler",
@@ -17,7 +17,11 @@
     "isolatedModules": true,
     "noEmit": true,
     "noUnusedLocals": true,
-    "jsx": "react-jsx"
+    "jsx": "react-jsx",
+    "paths": {
+      "starfx": ["../../src/index.ts"],
+      "starfx/react": ["../../src/react.ts"]
+    }
   },
   "include": ["./src"]
 }

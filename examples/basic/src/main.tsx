@@ -1,11 +1,21 @@
 import ReactDOM from "react-dom/client";
-import { createApi, createSchema, createStore, mdw, timer } from "starfx";
+import {
+  createApi,
+  createSchema,
+  createStore,
+  mdw,
+  slice,
+  timer,
+} from "starfx";
 import { Provider, useCache } from "starfx/react";
 
-const [schema, initialState] = createSchema();
-const store = createStore({ initialState });
-
 const api = createApi();
+const schema = createSchema({
+  cache: slice.table(),
+  loaders: slice.loaders(),
+});
+const store = createStore({ schema, tasks: [api.register] });
+
 // mdw = middleware
 api.use(mdw.api({ schema }));
 api.use(api.routes());
@@ -14,17 +24,11 @@ api.use(mdw.fetch({ baseUrl: "https://api.github.com" }));
 const fetchRepo = api.get(
   "/repos/neurosnap/starfx",
   { supervisor: timer() },
-  api.cache(),
+  api.cache()
 );
 
-store.run(api.register);
-
 function App() {
-  return (
-    <Provider schema={schema} store={store}>
-      <Example />
-    </Provider>
-  );
+  return <Example />;
 }
 
 function Example() {
@@ -47,7 +51,7 @@ function Example() {
 
 const root = document.getElementById("root") as HTMLElement;
 ReactDOM.createRoot(root).render(
-  <Provider schema={schema} store={store}>
+  <Provider store={store}>
     <App />
-  </Provider>,
+  </Provider>
 );

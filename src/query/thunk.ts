@@ -53,7 +53,13 @@ export interface ThunksApi<Ctx extends ThunkCtx> {
   use: (fn: Middleware<Ctx>) => void;
   /** Returns a middleware function that routes to action-specific middleware. */
   routes: () => Middleware<Ctx>;
-  /** Register the thunks with the current store scope. */
+  /**
+   * Register the thunks with the current store scope.
+   *
+   * This is a long-lived listener task. Callers who dispatch immediately after
+   * starting registration must coordinate any required startup readiness
+   * themselves.
+   */
   register: () => Operation<void>;
   /** Reset any dynamically bound middleware for created actions. */
   reset: () => void;

@@ -10,6 +10,10 @@
   "module": "./dist/esm/index.js",
   "scripts": {
     "test": "vitest --exclude examples",
+    "test:examples": "npm --prefix examples/tests-rtl test",
+    "typecheck": "tsc --noEmit",
+    "typecheck:lib": "tsc --noEmit --project tsconfig.lib.json",
+    "typecheck:examples": "tsc --noEmit -p examples/basic/tsconfig.json && tsc --noEmit -p examples/vite-react/tsconfig.json && tsc --noEmit -p examples/yjs/tsconfig.json && tsc --noEmit -p examples/tests-rtl/tsconfig.json",
     "lint": "biome check --write",
     "fmt": "biome check --write --linter-enabled=false",
     "ci": "biome ci .",
@@ -84,6 +88,16 @@
       "require": {
         "types": "./dist/types/react.d.ts",
         "default": "./dist/cjs/react.js"
+      }
+    },
+    "./effection": {
+      "import": {
+        "types": "./dist/types/effection.d.ts",
+        "default": "./dist/esm/effection.js"
+      },
+      "require": {
+        "types": "./dist/types/effection.d.ts",
+        "default": "./dist/cjs/effection.js"
       }
     },
     "./package.json": "./package.json"

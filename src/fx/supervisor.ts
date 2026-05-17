@@ -88,7 +88,9 @@ export function supervise<T, TArgs extends unknown[] = []>(
         yield* put({
           type: `${API_ACTION_PREFIX}supervise`,
           payload: res.error,
-          meta: `Exception caught, waiting ${waitFor}ms before restarting operation`,
+          meta: {
+            message: `Exception caught, waiting ${waitFor}ms before restarting operation`,
+          },
         });
         yield* sleep(waitFor);
       }

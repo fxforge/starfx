@@ -1,12 +1,8 @@
 import {
-  TypedUseSelectorHook,
   useDispatch,
-  useSelector as useSel,
 } from "starfx/react";
 import "./App.css";
-import { AppState, fetchUsers, schema } from "./api.ts";
-
-const useSelector: TypedUseSelectorHook<AppState> = useSel;
+import { fetchUsers, schema, useSelector } from "./api.ts";
 
 function App({ id }: { id: string }) {
   const dispatch = useDispatch();

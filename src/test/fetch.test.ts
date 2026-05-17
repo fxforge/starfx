@@ -13,11 +13,11 @@ const baseUrl = "https://starfx.com";
 const mockUser = { id: "1", email: "test@starfx.com" };
 
 const testStore = () => {
-  const [schema, initialState] = createSchema({
+  const schema = createSchema({
     loaders: slice.loaders(),
     cache: slice.table({ empty: {} }),
   });
-  const store = createStore({ initialState });
+  const store = createStore({ schema });
   return { schema, store };
 };
 
@@ -35,7 +35,7 @@ test("should be able to fetch a resource and save automatically", async () => {
   api.use(mdw.headers);
   api.use(mdw.fetch({ baseUrl }));
 
-  const actual: any[] = [];
+  const actual: unknown[] = [];
   const fetchUsers = api.get(
     "/users",
     { supervisor: takeEvery },

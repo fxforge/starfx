@@ -29,17 +29,17 @@ const emptyUser: User = { id: "", name: "", email: "" };
 const mockUser: User = { id: "1", name: "test", email: "test@test.com" };
 const mockUser2: User = { id: "2", name: "two", email: "two@test.com" };
 
-const jsonBlob = (data: any) => {
+const jsonBlob = (data: unknown) => {
   return JSON.stringify(data);
 };
 
 const testStore = () => {
-  const [schema, initialState] = createSchema({
+  const schema = createSchema({
     users: slice.table<User>({ empty: emptyUser }),
     loaders: slice.loaders(),
     cache: slice.table({ empty: {} }),
   });
-  const store = createStore({ initialState });
+  const store = createStore({ schema });
   return { schema, store };
 };
 
@@ -517,14 +517,13 @@ test("errorHandler", () => {
   );
 
   const store = createStore({
-    initialState: {
-      users: {},
-    },
+    schema: createSchema(),
   });
   store.run(query.register);
   store.dispatch(fetchUsers());
   expect(store.getState()).toEqual({
-    users: {},
+    cache: {},
+    loaders: {},
   });
   expect(a).toEqual(2);
 });

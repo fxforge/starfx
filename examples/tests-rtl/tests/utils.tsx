@@ -1,16 +1,11 @@
 import React, { type ReactElement } from "react";
 import { render, type RenderOptions } from "@testing-library/react";
 import { Provider } from "starfx/react";
-import { schema } from "../src/api";
 import { setupStore } from "../src/store";
 
 const AllTheProviders = ({ children }: { children: React.ReactNode }) => {
   const store = setupStore({});
-  return (
-    <Provider schema={schema} store={store}>
-      {children}
-    </Provider>
-  );
+  return <Provider store={store}>{children}</Provider>;
 };
 
 const customRender = (

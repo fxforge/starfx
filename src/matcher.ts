@@ -6,7 +6,7 @@ type Predicate<Guard extends AnyAction = AnyAction> = (
   action: Guard,
 ) => boolean;
 type StringableActionCreator<A extends AnyAction = AnyAction> = {
-  (...args: any[]): A;
+  (...args: never[]): A;
   toString(): string;
 };
 type SubPattern<Guard extends AnyAction = AnyAction> =
@@ -28,18 +28,32 @@ export type ActionPattern<Guard extends AnyAction = AnyAction> =
   | ActionSubPattern<Guard>
   | ActionSubPattern<Guard>[];
 
-function isThunk(fn: any): boolean {
+function isThunk(fn: unknown): fn is StringableActionCreator & {
+  run: unknown;
+  use: unknown;
+  name: string;
+} {
+  if (typeof fn !== "function") return false;
+
+  const thunk = fn as {
+    run?: unknown;
+    use?: unknown;
+    name?: unknown;
+    toString?: unknown;
+  };
+
   return (
-    typeof fn === "function" &&
-    typeof fn.run === "function" &&
-    typeof fn.use === "function" &&
-    typeof fn.name === "string" &&
-    typeof fn.toString === "function"
+    typeof thunk.run === "function" &&
+    typeof thunk.use === "function" &&
+    typeof thunk.name === "string" &&
+    typeof thunk.toString === "function"
   );
 }
 
-function isActionCreator(fn: any): boolean {
-  return !!fn && fn._starfx === true;
+function isActionCreator(fn: unknown): fn is StringableActionCreator {
+  return (
+    !!fn && typeof fn === "function" && "_starfx" in fn && fn._starfx === true
+  );
 }
 
 /**
